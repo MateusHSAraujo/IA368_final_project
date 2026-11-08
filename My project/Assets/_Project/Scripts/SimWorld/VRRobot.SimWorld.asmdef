@@ -1,0 +1,14 @@
+{
+    "name": "VRRobot.SimWorld",
+    "rootNamespace": "VRRobot.SimWorld",
+    "references": ["VRRobot.Core"],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": ["NetMQ.dll", "AsyncIO.dll", "NaCl.dll"],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

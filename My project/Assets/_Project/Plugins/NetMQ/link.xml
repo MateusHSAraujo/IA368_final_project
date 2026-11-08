@@ -1,0 +1,6 @@
+<linker>
+  <!-- NetMQ relies on reflection/internal threads: keep IL2CPP (Android/Quest) from stripping types. -->
+  <assembly fullname="NetMQ" preserve="all"/>
+  <assembly fullname="AsyncIO" preserve="all"/>
+  <assembly fullname="NaCl" preserve="all"/>
+</linker>

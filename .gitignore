@@ -1,0 +1,20 @@
+# Unity rules: see "My project/.gitignore" (paths relative to the Unity project)
+
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+*~
+Thumbs.db
+desktop.ini
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Obsolete folder (created by the old WSL sync; scripts live in "My project/Assets/_Project")
+/Assets/
+
+# CoppeliaSim backups
+*.ttt.bak
