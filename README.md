@@ -15,7 +15,7 @@ This repository holds the **Windows side**: the Unity project, the CoppeliaSim s
 ├── STAGE1_UNITY_PLAN.md      # Stage 1 plan and execution status (CoppeliaSim → Unity converter)
 ├── CLAUDE.md                 # Instructions for the Windows-side agent
 ├── coppelia_scripts/         # ZMQ scene streamer (Lua) + installer, protocol test, reference capture
-├── scene_house/              # CoppeliaSim scenes
+├── scene_house/              # CoppeliaSim scenes (Git LFS)
 ├── scripts/                  # PowerShell helpers (Stage 2)
 └── My project/               # Unity 6000.0.44f1 project (URP); code in Assets/_Project/
 ```
@@ -27,3 +27,5 @@ This repository holds the **Windows side**: the Unity project, the CoppeliaSim s
 3. Open `My project/Assets/_Project/Scenes/SimWorld_Desktop.unity` in Unity and press Play.
 
 Details: [`coppelia_scripts/README_COPPELIA_SETUP.md`](coppelia_scripts/README_COPPELIA_SETUP.md) and [`My project/Assets/_Project/README_UNITY.md`](My%20project/Assets/_Project/README_UNITY.md).
+
+Clone with Git LFS installed (`git lfs install`) to get the scenes and binaries.

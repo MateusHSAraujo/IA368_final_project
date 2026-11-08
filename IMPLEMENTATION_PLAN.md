@@ -21,7 +21,7 @@
 > 5. **Unity Editor access (revised):** The Unity project lives in `C:\Users\mateu\unicamp\IA368\projeto_final\My project\` (Unity **6000.0.44f1**, URP, Input System). The Unity-side agent (Claude Code on Windows) accesses the Editor through MCP (`unity-mcp`): it creates scenes, GameObjects and assets, reads the compile console and runs tests. C# scripts are written **directly** in `My project/Assets/_Project/`. The `unity_scripts/` copy in WSL no longer exists.
 > 6. **Hybrid directory architecture (WSL2 + Windows) (revised): two Git repositories, one per machine.**
 >    * **WSL2 (`ext4`), repository `IA368_final_project_ros2`:** `/home/mateus/ia368/projeto_final/` hosts the ROS 2 workspace (`ros2_ws/`), the ROS-side Python tests (`tests/`) and `scripts/*.sh`. The planning documents in it are **symbolic links** into `windows_workspace/`, so there is a single copy.
->    * **Windows (`NTFS`), repository `IA368_final_project`:** `C:\Users\mateu\unicamp\IA368\projeto_final` (`/mnt/c/...`, symlink `windows_workspace` in WSL) is the **master copy** of the Unity project (`My project/`), the CoppeliaSim scripts (`coppelia_scripts/`), the scenes (`scene_house/`), `scripts/*.ps1` and the planning documents (`PROJECT_PROPOSAL.md`, `IMPLEMENTATION_PLAN.md`, `STAGE1_UNITY_PLAN.md`).
+>    * **Windows (`NTFS`), repository `IA368_final_project`:** `C:\Users\mateu\unicamp\IA368\projeto_final` (`/mnt/c/...`, symlink `windows_workspace` in WSL) is the **master copy** of the Unity project (`My project/`), the CoppeliaSim scripts (`coppelia_scripts/`), the scenes (`scene_house/`, Git LFS), `scripts/*.ps1` and the planning documents (`PROJECT_PROPOSAL.md`, `IMPLEMENTATION_PLAN.md`, `STAGE1_UNITY_PLAN.md`).
 >    * **Sync rule:** `sync_to_windows.sh` copies **only** `scripts/*.ps1`. It must never copy documents, C#, Lua or scenes (it would overwrite the Windows master copy). The `projeto_final/Assets/` folder (outside the Unity project, created by the old sync) is obsolete and ignored by Git.
 > 7. **Verification strategy (revised):** ROS side: `colcon build`, `pytest` and *Mock Action Servers* on WSL2. Unity/CoppeliaSim side: compilation without errors in the Unity console, EditMode tests (Unity Test Framework) and Play mode against the real CoppeliaSim.
 
@@ -90,7 +90,7 @@ C:\Users\mateu\unicamp\IA368\projeto_final\   (/mnt/c/Users/mateu/unicamp/IA368/
 ├── PROJECT_PROPOSAL.md
 ├── IMPLEMENTATION_PLAN.md
 ├── STAGE1_UNITY_PLAN.md
-├── scene_house/                        # CoppeliaSim scenes
+├── scene_house/                        # CoppeliaSim scenes (Git LFS)
 │   ├── scene_house.ttt                 # Base scene (open in CoppeliaSim)
 │   └── p3dx_nav2.ttt                   # Second scene, used to validate the converter on other scenes
 ├── coppelia_scripts/                   # Stage 1 (CoppeliaSim side)

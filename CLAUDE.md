@@ -16,7 +16,7 @@ Everything committed to the repositories is in **English**: code, comments, log/
 ## Git
 - Remotes use SSH; the SSH keys work without prompting on both Windows and WSL.
 - The repository root is this folder. The Unity rules live in `My project/.gitignore` and `My project/.gitattributes` (paths relative to the Unity project); the root `.gitattributes` holds the `[attr]` macros (`lfs`, `unity-json`, `unity-yaml`), because Git only accepts macros in the top-level file.
-- **No Git LFS**: the GitHub account has no LFS budget (push was refused). The root `.gitattributes` redefines the Unity template's `lfs` macro as `binary`, so images, DLLs and the `*.ttt` scenes are stored as plain binary blobs. Keep files well below GitHub's 100 MB limit, and avoid committing scene re-saves needlessly (each `scene_house.ttt` save adds ~30 MB to history).
+- **Git LFS** (`git lfs install --local`): `*.ttt` scenes plus the Unity binary rules (images, DLLs, ...). The first commit (`6cb7c45`) still stores them as plain blobs; LFS starts from the commit that re-enabled it. The GitHub repository setting "Include Git LFS objects in archives" must be enabled, otherwise LFS pushes are refused with "exceeded its LFS budget".
 - `projeto_final/Assets/` (outside the Unity project) is obsolete and ignored.
 
 ## Locations

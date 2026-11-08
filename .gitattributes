@@ -1,8 +1,5 @@
 # Macros used by "My project/.gitattributes" (Unity rules); Git only accepts [attr] in the top-level file
-# Git LFS is disabled (no LFS budget on the GitHub account): the Unity template's
-# "lfs" rules now mean plain binary files. To re-enable LFS, restore:
-#   [attr]lfs filter=lfs diff=lfs merge=lfs -text
-[attr]lfs               binary
+[attr]lfs               filter=lfs diff=lfs merge=lfs -text
 [attr]unity-json        eol=lf linguist-language=json
 [attr]unity-yaml        merge=unityyamlmerge eol=lf linguist-language=yaml
 
@@ -13,5 +10,5 @@
 *.sh     text eol=lf
 *.ps1    text eol=crlf
 
-# CoppeliaSim scenes (binary, up to ~30 MB each)
-*.ttt    binary
+# CoppeliaSim scenes (binary, up to ~30 MB each) in Git LFS
+*.ttt    filter=lfs diff=lfs merge=lfs -text
