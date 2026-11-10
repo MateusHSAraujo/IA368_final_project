@@ -31,6 +31,7 @@ namespace VRRobot.SimWorld
         public float retryIntervalSeconds = 2f;
 
         [Header("Build")]
+        [Tooltip("Off: the build starts only when Build() is called (e.g. from a start menu).")]
         public bool buildOnStart = true;
         [Tooltip("Disables the renderer of shapes that are invisible in CoppeliaSim (roof, resizable floor)")]
         public bool hideInvisibleShapes = true;
@@ -89,6 +90,9 @@ namespace VRRobot.SimWorld
         {
             StopAll();
         }
+
+        /// <summary>Starts connecting and building the scene. Does nothing if a build is already running.</summary>
+        public void Build() => StartBuild();
 
         /// <summary>Discards everything and rebuilds the scene from scratch.</summary>
         public void Reload()
@@ -267,6 +271,7 @@ namespace VRRobot.SimWorld
             _registry.SetReady(false);
             var newShapes = ApplyHierarchy(list);
             _registry.SceneVersion = list.sceneVersion;
+            _registry.RaiseHierarchyApplied();
 
             yield return BuildMeshes(newShapes);
             State = BuildState.Ready;

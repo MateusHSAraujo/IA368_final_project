@@ -46,6 +46,12 @@ namespace VRRobot.SimWorld
         /// <summary>Full scene built (or rebuilt after a "scene" event).</summary>
         public event Action SceneBuilt;
 
+        /// <summary>
+        /// Hierarchy (objects, parents and poses) applied after a "list", before the meshes are built.
+        /// Raised on the first build and on every resynchronization.
+        /// </summary>
+        public event Action HierarchyApplied;
+
         /// <summary>Object created (it already has a Transform and pose; the mesh may come later).</summary>
         public event Action<SimObject> ObjectSpawned;
 
@@ -110,6 +116,8 @@ namespace VRRobot.SimWorld
             IsReady = ready;
             if (ready) SceneBuilt?.Invoke();
         }
+
+        internal void RaiseHierarchyApplied() => HierarchyApplied?.Invoke();
 
         internal void RaiseMeshReady(SimObject o) => MeshReady?.Invoke(o);
 

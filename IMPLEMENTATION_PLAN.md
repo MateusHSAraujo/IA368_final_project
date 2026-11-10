@@ -253,6 +253,10 @@ Create and build the `ros2_ws` workspace with `vr_robot_pkg` and `ROS-TCP-Endpoi
 ### Stage 4: VR Locomotion and Spatial Control Menu
 
 #### Goal
+> **Revised scope:** the Meta Interaction SDK (Building Blocks, `com.meta.xr.sdk.interaction.ovr` 207.0.1) replaces the XR Interaction Toolkit (`XRGrabInteractable` etc. become Meta `Grabbable`/`HandGrabInteractable` later).
+> - [x] **VR locomotion (walk, snap turn, teleport on a runtime NavMesh) — done**, see `STAGE4_VR_LOCOMOTION_PLAN.md`.
+> - [ ] VR Spatial Menu (below).
+
 Configure avatar locomotion and implement the **VR Spatial Menu** (`VRModeAndMissionMenu.cs`), from which the user can open/close the Holographic Tactical Table, select navigation tools and control the mission.
 
 #### Files to Create

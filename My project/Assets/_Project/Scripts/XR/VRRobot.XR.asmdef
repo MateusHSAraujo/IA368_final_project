@@ -1,0 +1,14 @@
+{
+    "name": "VRRobot.XR",
+    "rootNamespace": "VRRobot.XR",
+    "references": ["VRRobot.Core", "VRRobot.SimWorld", "Oculus.Interaction", "Oculus.VR", "UnityEngine.UI", "Unity.TextMeshPro"],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

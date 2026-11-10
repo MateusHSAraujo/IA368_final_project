@@ -13,6 +13,7 @@ This repository holds the **Windows side**: the Unity project, the CoppeliaSim s
 ├── PROJECT_PROPOSAL.md       # Project proposal
 ├── IMPLEMENTATION_PLAN.md    # Stage-by-stage implementation plan
 ├── STAGE1_UNITY_PLAN.md      # Stage 1 plan and execution status (CoppeliaSim → Unity converter)
+├── STAGE4_VR_LOCOMOTION_PLAN.md # Stage 4 (part 1) plan and status: VR scene + locomotion (Meta XR SDK)
 ├── CLAUDE.md                 # Instructions for the Windows-side agent
 ├── coppelia_scripts/         # ZMQ scene streamer (Lua) + installer, protocol test, reference capture
 ├── scene_house/              # CoppeliaSim scenes (Git LFS)
