@@ -90,6 +90,7 @@ C:\Users\mateu\unicamp\IA368\projeto_final\   (/mnt/c/Users/mateu/unicamp/IA368/
 ├── PROJECT_PROPOSAL.md
 ├── IMPLEMENTATION_PLAN.md
 ├── STAGE1_UNITY_PLAN.md
+├── STAGE4_VR_LOCOMOTION_PLAN.md
 ├── scene_house/                        # CoppeliaSim scenes (Git LFS)
 │   ├── scene_house.ttt                 # Base scene (open in CoppeliaSim)
 │   └── p3dx_nav2.ttt                   # Second scene, used to validate the converter on other scenes
@@ -112,10 +113,12 @@ C:\Users\mateu\unicamp\IA368\projeto_final\   (/mnt/c/Users/mateu/unicamp/IA368/
         │   │   ├── CoppeliaSceneBuilder.cs
         │   │   ├── CoppeliaPoseSubscriber.cs
         │   │   └── SimWorldRegistry.cs # EXTENSION POINT for VR/ROS (handle/name -> GameObject, events)
-        │   ├── Desktop/                # asmdef VRRobot.Desktop: free camera + HUD (replaceable by the XR Origin)
-        │   └── HMI/                    # (Stages 4–6, future) VR Menu, Tactical Table, Path/No-Go, Teleop
-        ├── Tests/EditMode/             # Converter and decoder tests
-        └── Scenes/SimWorld_Desktop.unity
+        │   ├── Desktop/                # asmdef VRRobot.Desktop: free camera + HUD (desktop scene only)
+        │   ├── XR/                     # asmdef VRRobot.XR: locomotion, NavMesh baker, VR menu, start flow (Stage 4)
+        │   └── HMI/                    # (Stages 4–6, future) Spatial Menu pages, Tactical Table, Path/No-Go, Teleop
+        ├── Prefabs/                    # SimWorld, VrMenu, StartMenu
+        ├── Tests/EditMode/             # Converter, decoder and overview framing tests
+        └── Scenes/                     # SimWorld_Desktop.unity, VrScene.unity
 ```
 
 ---
@@ -230,6 +233,11 @@ Provide scripts that automate `adb reverse` and the dynamic Windows host IP conf
 #### Stage 2 Autonomous Verification Criteria (offline on WSL2)
 * Validate the syntax with `bash -n scripts/get_windows_host_ip.sh`, test the returned IP and run `bash scripts/sync_to_windows.sh`.
 
+#### Stage 2 status — **done** (2026-11-13, WSL repo)
+* `get_windows_host_ip.sh`: `$COPPELIA_HOST` → `127.0.0.1` in mirrored mode → WSL default gateway (NAT, currently `172.23.224.1`); `--check [port]` tests reachability. Python twin: `vr_robot_pkg/network.py` (used by the bridge).
+* `setup_adb_reverse.ps1`: `adb reverse` 10000/23005/23006, `-List`, `-Remove`, `-PortProxy`/`-RemovePortProxy` (admin; only if WSL localhost forwarding fails). Parsed without errors by Windows PowerShell; not yet run with a Quest connected.
+* Unity Editor reaches ROS-TCP-Endpoint at `localhost:10000` through WSL2 localhost forwarding (verified with `Test-NetConnection`).
+
 ---
 
 ### Stage 3: Pioneer P3-DX Robotics Base on WSL2 (ROS 2–ZMQ bridge, `slam_toolbox`, `Nav2` and Keepout Filters)
@@ -248,14 +256,26 @@ Create and build the `ros2_ws` workspace with `vr_robot_pkg` and `ROS-TCP-Endpoi
 * `colcon build` in `ros2_ws` without errors.
 * Test `coppelia_bridge_node` with `mock_mode:=true`, making sure it publishes synthetic `/myRobot/scan`, `/myRobot/odom` and `/tf`.
 
+#### Stage 3 status — **done** (2026-11-13, WSL repo; validated live against `scene_house.ttt`)
+**The ROS interface contract for Stages 5–6 (topics, frames, QoS, reserved `/hmi/*` topics) is in the WSL repo: `ros2_ws/src/vr_robot_pkg/README.md`.**
+* `ros2 launch vr_robot_pkg vr_robot_bringup.launch.py` (or `mock_mode:=true` without CoppeliaSim): bridge, keepout mask + `costmap_filter_info_server`, slam_toolbox, Nav2, ROS-TCP-Endpoint (git submodule, `main-ros2`, v0.7.0) on port 10000.
+* Live results: odom 12–15 Hz, scan 7–8 Hz, camera 7–8 Hz (JPEG 320×240, only while `/camera/enable` is true); NavigateToPose/NavigateThroughPoses between dining room, living room and corridor succeed; a keepout zone becomes lethal in the costmap and plans avoid it; a ROS-TCP-Connector-protocol client receives `/map` and `/hmi/robot_pose` through port 10000.
+* Deviations from the original plan:
+  * **One bridge node** (`coppelia_bridge_node`) instead of the class nodes, publishing also `/hmi/robot_pose` (PoseStamped in `map`, 10 Hz, for the table avatar) and `/myRobot/bridge_status`.
+  * **Scene changes in `scene_house.ttt`** (via Remote API, saved by the user): `/myRobot` pasted from `p3dx_nav2.ttt`; `/myRobot/frontCamera` (320×240, 60°, explicit handling); house shapes made respondable (the robot drove through the walls); real-time mode on; **the class laser replaced by a fast depth-camera laser** (two 92° depth vision sensors, same 452-sample output). Tools: `scripts/coppelia/prepare_scene_house.py`, `scripts/coppelia/install_fast_laser.py` (WSL repo).
+  * Why: the class laser (452 proximity-sensor rays per step in Lua) slowed the simulation to 0.47× real time even in `p3dx_nav2.ttt` and 0.24× in the house. CoppeliaSim's own window rendering of the 448k-triangle house costs as much again, so the bridge turns the CoppeliaSim display off while it runs (`coppelia_display:=true` keeps it). Result: ~0.7–0.87× real time.
+  * While simulating, the ZMQ Remote API answers only ~1–2 requests per simulation step: the bridge makes **one batched call per cycle** (`remoteExchange()` in the laser script: wheels in; pose, velocity, scan and JPEG frame out).
+  * Nav2: P3-DX footprint polygon, rolling 20×20 m global costmap (the 180° laser maps only what is ahead at startup), transform tolerances 0.5 s, relaxed progress checker, `inf_is_valid` on the laser.
+  * Keepout mask: fixed grid 0.05 m, origin (−2.5, −4.25), 310×210 cells (house bounding box), published by a placeholder `keepout_mask_node` until the Stage 5 supervisor owns it. Nav2 does not inflate keepout cells: the supervisor will dilate strokes by the robot half-width.
+
 ---
 
 ### Stage 4: VR Locomotion and Spatial Control Menu
 
 #### Goal
 > **Revised scope:** the Meta Interaction SDK (Building Blocks, `com.meta.xr.sdk.interaction.ovr` 207.0.1) replaces the XR Interaction Toolkit (`XRGrabInteractable` etc. become Meta `Grabbable`/`HandGrabInteractable` later).
-> - [x] **VR locomotion (walk, snap turn, teleport on a runtime NavMesh) — done**, see `STAGE4_VR_LOCOMOTION_PLAN.md`.
-> - [ ] VR Spatial Menu (below).
+> - [x] **VR locomotion (walk, snap turn, teleport on a runtime NavMesh), VR menu shell with a Settings page (fly mode, height) and start flow — done** (committed `27425d3`), see `STAGE4_VR_LOCOMOTION_PLAN.md`. The existing `VrMenu` (Meta ray-interactable canvas with pages) is the base for the Spatial Menu.
+> - [ ] VR Spatial Menu (below): to be planned together with the Unity side of Stage 5. ROS-TCP-Connector v0.7.0 (protocol ROS2, matching the endpoint) installed in the Unity project on 2026-11-15.
 
 Configure avatar locomotion and implement the **VR Spatial Menu** (`VRModeAndMissionMenu.cs`), from which the user can open/close the Holographic Tactical Table, select navigation tools and control the mission.
 
@@ -305,6 +325,14 @@ Implement the **Holographic Tactical Table** in Unity (invoked from the menu, ma
 * Run `pytest tests/test_minimap_uv_math.py` to validate the UV coordinate conversions, waypoints and keepout grid.
 * Run `pytest tests/test_mission_supervisor.py` with *Mock Action Servers* for `NavigateToPose` and `NavigateThroughPoses`.
 * Run `bash scripts/sync_to_windows.sh`.
+
+#### Stage 5 status — **ROS side done** (2026-11-14, WSL repo; validated live against `scene_house.ttt`). Unity side (table, painters) pending.
+**The Unity-facing contract is in the WSL repo: `ros2_ws/src/vr_robot_pkg/README.md`, sections "HMI topics (mission supervisor)" and "Saved maps".**
+* `mission_supervisor_node` is the only node Unity talks to: `/hmi/goal` (PoseStamped → NavigateToPose), `/hmi/path` (Path → NavigateThroughPoses, thinned to waypoints ≥ 0.3 m), `/hmi/mission_cmd` (`PAUSE`/`RESUME`/`CANCEL`), `/hmi/keepout_stroke` (PolygonStamped, `z` = brush radius, empty clears) → `/keepout_filter_mask`, state in `/hmi/mission_state` (JSON). A nonzero `/cmd_vel_teleop` auto-pauses the mission (twist_mux routing is Stage 6).
+* **Saved maps (new):** `/hmi/map_cmd` `SAVE <name>` / `LOAD <name>` / `RESET`, state in `/hmi/map_state` (JSON, includes the list of saved maps). Keepout zones are saved with the map. A reference map of the whole house, `scene_house`, is committed; `ros2 launch vr_robot_pkg vr_robot_bringup.launch.py map:=scene_house` loads it about 8 s after startup, so a session can go straight to the table without driving the robot around.
+* `map` frame == CoppeliaSim/Unity world (exactly): odometry is ground truth, so slam_toolbox runs with scan matching and loop closing off (a bad scan match during exploration had shifted `map → odom` by 2.2 m / 19°).
+* Tests: 197 offline (`tests/test_mission_supervisor.py` with mock Nav2 action servers and mock slam_toolbox services, `test_mission_logic.py`, `test_map_store.py`, keepout strokes). Live: `tests/live/check_live_stack.py hmi_goal hmi_path hmi_pause hmi_keepout hmi_map` all pass; a goal across the house (to (10.5, 2.3)) on the loaded map takes about 3 min (simulation below real time).
+* Deviation: `test_minimap_uv_math.py` was not created; the UV → meters conversion moved to Unity (item 2.4.4), and the ROS-side math (waypoint thinning, stroke rasterization) is covered by `test_mission_logic.py` and `test_keepout_mask.py`.
 
 ---
 

@@ -114,7 +114,7 @@ The VR menu, tactical table and teleoperation (rest of Stages 4–6) are out of 
 - [x] EditMode tests 16/16; Desktop regression: `SimWorld_Desktop` loads the house through the prefab (13.6 s, no errors). The Desktop fly camera was not re-tested with keyboard input.
 - ~~Finding: all doors closed~~ — wrong, see Part 1b (the islands came from agent height 2.0 / radius 0.35).
 - [x] Step 6: `README_UNITY.md` (VR scene section), `IMPLEMENTATION_PLAN.md` (Stage 4: Meta Interaction SDK, locomotion done), `CLAUDE.md` (status + VR locomotion lessons).
-- [ ] Step 0 (commit, when the user asks).
+- [x] Step 0: XR setup committed in `dcae0b6`; parts 1–1e committed in `27425d3`.
 
 ## Part 1b — VR menu (minimal) + fly mode (approved 2026-11-08)
 Context: the project's goal is the HMI to control the vacuum robot, not a perfectly realistic scene. Walking keeps the expected physics, but if the player gets stuck they can switch to a "creative" fly mode (no collisions) from a settings page of the VR menu, which will later also host the robot control table.
@@ -134,7 +134,7 @@ Steps:
 - [x] Step 3: `VrFlyMode` (+ `VrPlayerBootstrap.GuardPaused`), yellow "FLY MODE" HUD under the view.
 - [x] Step 4 (simulator, real input through the XR Operator): left Menu button opens the menu in front of the player; right ray aimed at the toggle + trigger → fly mode on; right trigger up (y −0.01 → 3.57), left stick through the outer wall (x −0.37 → 5.68), left trigger down (→ 0.86); menu toggle again → fly mode off, the player fell onto the coffee table and walked off it to the floor without guard recoveries. EditMode 16/16. Desktop regression not re-run (nothing it uses changed).
 - [x] Step 5: docs (`README_UNITY.md`, `CLAUDE.md`).
-- [ ] Commit (when the user asks).
+- [x] Commit (`27425d3`).
 
 ## Part 1c — Start flow (main menu + overview while building) and sky (approved 2026-11-09)
 Context: the player used to stand in the middle of the scene while it was being built. Now the app opens on a main menu, the CoppeliaSim import starts only after the user confirms, the player watches the construction from an elevated viewpoint, and is then spawned at the best point. The black background outside the house is replaced by the default procedural sky (the same one the Editor shows).
@@ -154,7 +154,7 @@ Deferred (agreed): "Back to main menu" in Settings; "Reconnect" button when the 
 - [x] Simulator (real input through the XR Operator): main menu in front of the head over the procedural sky; right ray + trigger on "Load CoppeliaSim scene" → overview at (−1.03, 8.17, −5.00) looking at the house center (radius 7.1 m), meshes appearing with "Building meshes: n / 52" and the progress bar; scene built in 5.9 s, NavMesh 160 ms; spawn at (−0.37, 0.03, 0.33); left stick walked 2 m afterwards. Streamer unreachable (wrong port, runtime only): panel shows "Retrying connection..." with the timeout message while the builder retries. No errors in the console.
 - [x] EditMode 21/21 (5 new `OverviewFramingTests`).
 - [x] Docs (`README_UNITY.md`, `CLAUDE.md`).
-- [ ] Commit (when the user asks).
+- [x] Commit (`27425d3`).
 
 ## Part 1d — Height setting + menu follows the player (approved 2026-11-09)
 Context (user test): there was no way to adjust the user's height, and after turning fly mode off from a high position the menu stayed up in the air, out of view, so the player could believe they were stuck.
@@ -171,7 +171,7 @@ Steps:
 - [x] Simulator (real input through the XR Operator): left Menu → Settings shows the height row; ray + trigger on "+" twice → offset +0.10, eyes 1.694 → 1.794 m and the panel rose with the view; fly mode on (toggle), menu closed, right trigger up to eyes 4.81 m, menu opened, toggle off → the player fell 3 m (eyes 1.79 m = 1.69 + 0.10) and the panel came down with them (y 4.71 → 1.69), still in front of the eyes. Restarted Play mode → offset +0.10 restored (eyes 1.79 m after spawn; failed before clearing `StandingSetting._locomotor`). Reset → 0.00, eyes 1.69 m.
 - [x] EditMode 21/21. Console without errors.
 - [x] Docs (`README_UNITY.md`, `CLAUDE.md`).
-- [ ] Commit (when the user asks).
+- [x] Commit (`27425d3`).
 
 ## Part 1e — Code review fixes (approved 2026-11-09)
 A `/code-review medium` pass found 10 issues; all fixed. The user asked that, when the player cannot be spawned normally, an error is shown and the player starts at the CoppeliaSim origin (0, 0) in fly mode.
@@ -194,4 +194,4 @@ A `/code-review medium` pass found 10 issues; all fixed. The user asked that, wh
 - [x] Simulator: normal flow (overview shows the whole house with the panel above it; spawn at (−0.37, 0.03, 0.33)); rebake while flying → "player left where they are"; fly off above the outside (5.7, 2.0, 0.43) → landed inside at (2.28, 0.03, 0.81); spawn point forced 100 m away → fallback at the origin in fly mode, turned −30°, message readable; baker layers set to Nothing → "no collider sources" → same fallback; OK hides the panel; fly off without NavMesh → standing on the floor. NavMesh log back to 209 triangles / 133.9 m² after relaxing the own-triangle tolerance (5 → 20 cm).
 - [x] EditMode 22/22.
 - [x] Docs.
-- [ ] Commit (when the user asks).
+- [x] Commit (`27425d3`).

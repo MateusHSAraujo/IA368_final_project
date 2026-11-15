@@ -17,7 +17,7 @@ This repository holds the **Windows side**: the Unity project, the CoppeliaSim s
 ├── CLAUDE.md                 # Instructions for the Windows-side agent
 ├── coppelia_scripts/         # ZMQ scene streamer (Lua) + installer, protocol test, reference capture
 ├── scene_house/              # CoppeliaSim scenes (Git LFS)
-├── scripts/                  # PowerShell helpers (Stage 2)
+├── scripts/                  # PowerShell helpers (Stage 2): setup_adb_reverse.ps1 (Quest 3 port forwarding), mirrored from the ROS repo
 └── My project/               # Unity 6000.0.44f1 project (URP); code in Assets/_Project/
 ```
 
@@ -26,6 +26,21 @@ This repository holds the **Windows side**: the Unity project, the CoppeliaSim s
 1. Open `scene_house/scene_house.ttt` in CoppeliaSim 4.10.
 2. `cd coppelia_scripts` and `python -u install_streamer.py`.
 3. Open `My project/Assets/_Project/Scenes/SimWorld_Desktop.unity` in Unity and press Play.
+
+## Status
+
+| Stage | Status |
+|---|---|
+| 1. CoppeliaSim → Unity scene converter (ZMQ) | Done |
+| 2. Network scripts (WSL ↔ Windows ↔ Quest) | Done (ROS repo) |
+| 3. P3-DX ROS 2 stack: bridge, slam_toolbox, Nav2 + Keepout Filter, ROS-TCP-Endpoint | Done (ROS repo) |
+| 4. VR scene: locomotion, VR menu, start flow (`VrScene.unity`, Meta XR Simulator) | Locomotion done; Spatial Menu pending |
+| 5. Holographic Tactical Table + mission supervisor | ROS side done; Unity side pending |
+| 6. First-person teleoperation + `twist_mux` | Pending |
+
+## VR scene
+
+Open `My project/Assets/_Project/Scenes/VrScene.unity` and press Play with the Meta XR Simulator active (menu Meta > Meta XR Simulator); the main menu loads the CoppeliaSim scene on demand. For the robot features, start the ROS stack in WSL (`ros2 launch vr_robot_pkg vr_robot_bringup.launch.py map:=scene_house`, see the ROS repo); Unity connects to `127.0.0.1:10000`.
 
 Details: [`coppelia_scripts/README_COPPELIA_SETUP.md`](coppelia_scripts/README_COPPELIA_SETUP.md) and [`My project/Assets/_Project/README_UNITY.md`](My%20project/Assets/_Project/README_UNITY.md).
 

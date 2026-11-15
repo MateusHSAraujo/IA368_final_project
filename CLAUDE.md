@@ -4,21 +4,33 @@ Reference documents:
 - `PROJECT_PROPOSAL.md`: overview.
 - `IMPLEMENTATION_PLAN.md`: revised stage-by-stage plan. Section 2.4 lists the open architecture items for Stages 3–6.
 - `STAGE1_UNITY_PLAN.md`: detailed plan of Stage 1 (CoppeliaSim → Unity converter, no VR), with its execution status. Done.
-- `STAGE4_VR_LOCOMOTION_PLAN.md`: detailed plan of the **current task** (VR scene + locomotion), with its execution status. **It is the source of truth for the Windows-side execution**; keep it updated (execution status, deviations) as the work progresses.
+- `STAGE4_VR_LOCOMOTION_PLAN.md`: detailed plan of Stage 4 part 1 (VR scene + locomotion, menus, start flow), with its execution status. Done and committed.
+- Each new Windows-side task gets its own `STAGE<n>_<TOPIC>_PLAN.md` with an execution status section; it is the source of truth for that task, kept updated (status, deviations) as the work progresses.
 
-## Current status and task (2026-11-09)
-- **Stage 1 done** (desktop converter, `SimWorld_Desktop.unity`). Stages 2–3 (ROS side, WSL) not started.
-- **Stage 4, part 1 implemented and validated in the simulator** (walk, snap turn, teleport, reachability filter, recovery guard). **Part 1b** (VR menu with Settings page + fly mode, NavMesh agent fix) and **Part 1c** (main menu → overview while the scene builds → spawn; procedural sky) , **Part 1d** (height setting, menu follows the player) and **Part 1e** (code-review fixes: spawn/NavMesh fallback to the origin in fly mode, landing resolution, overview framing) implemented and validated in the simulator. Pending: user review/commit.
-- **Task (done) — Stage 4, part 1: VR scene with locomotion** (`STAGE4_VR_LOCOMOTION_PLAN.md`). Finish the XR package setup, port `SimWorld` (as a shared prefab) into `Assets/_Project/Scenes/VrScene.unity` (Meta Building Blocks: Camera Rig, Comprehensive Interaction Rig with Locomotor, Teleport Interactable) and implement only locomotion: left stick = smooth walk, right stick = snap turn 45° + teleport. Teleport targets come from a NavMesh baked at runtime and filtered by reachability (never by CoppeliaSim object names). Validate in the Editor with the Meta XR Simulator against `scene_house.ttt`.
+## Current status (2026-11-15)
+- **Stage 1 done** (desktop converter, `SimWorld_Desktop.unity`).
+- **Stages 2 and 3 done** (WSL repo, 2026-11-13, validated live against `scene_house.ttt`): network scripts, `coppelia_bridge_node` (scan, odom, TF, compressed camera, `cmd_vel`), slam_toolbox, Nav2 with the Keepout Filter, ROS-TCP-Endpoint v0.7.0 on port 10000.
+- **Stage 4, part 1 done and committed** (`27425d3`, `STAGE4_VR_LOCOMOTION_PLAN.md`): VR scene with locomotion (walk, snap turn, teleport on a runtime NavMesh, recovery guard), VR menu with a Settings page (fly mode, height), start flow (main menu → overview while building → spawn), procedural sky. Validated in the Meta XR Simulator.
+- **Stage 5 ROS side done** (WSL repo, 2026-11-14): `mission_supervisor_node` (missions, pause/resume, keepout strokes, saved maps; reference map `scene_house`).
+- **Next on this side:** Stage 4 VR Spatial Menu + Stage 5 Unity side (Holographic Tactical Table, point-and-click, path painting, no-go brush), then Stage 6 teleop (`FirstPersonTeleopController`). ROS-TCP-Connector v0.7.0 (protocol ROS2) is installed in the Unity project. Next on the WSL side: `twist_mux` (Stage 6).
 - Prefer Meta Building Blocks and Meta's Interaction SDK patterns over custom code. The Meta Interaction SDK replaces the XR Interaction Toolkit mentioned in `IMPLEMENTATION_PLAN.md`.
+
+## Unity ↔ ROS 2 interface (Stages 5–6)
+- **Contract:** WSL repo `ros2_ws/src/vr_robot_pkg/README.md` (from Windows: `\\wsl.localhost\Ubuntu-24.04\home\mateus\ia368\projeto_final\ros2_ws\src\vr_robot_pkg\README.md`). Read it before any ROS work in Unity; it is the source of truth for topics, types, QoS and frames.
+- Unity talks only to `mission_supervisor` (ROS-TCP-Connector cannot call actions): publishes `/hmi/goal` (PoseStamped), `/hmi/path` (Path), `/hmi/mission_cmd` (`PAUSE`/`RESUME`/`CANCEL`), `/hmi/keepout_stroke` (PolygonStamped, `z` = brush radius, empty clears), `/hmi/map_cmd` (`SAVE`/`LOAD`/`RESET`), `/camera/enable` (Bool) and, in Stage 6, `/cmd_vel_teleop` (Twist, ≥ 10 Hz while the deadman is held). Subscribes to `/map`, `/hmi/robot_pose`, `/plan`, `/hmi/mission_state` and `/hmi/map_state` (JSON strings), `/camera/image_raw/compressed`, `/myRobot/bridge_status`.
+- Unity must **not** publish `/keepout_filter_mask` (ROS-TCP-Endpoint cannot publish `transient_local`).
+- The `map` frame **is** the Unity/CoppeliaSim world (ground-truth odometry, `map → odom` identity): ROS → Unity is the fixed axis conversion, no calibration. `/map` size and origin change while mapping: rebuild the table texture on every message.
+- Endpoint: `127.0.0.1:10000` (Editor through WSL2 localhost forwarding; Quest through `scripts/setup_adb_reverse.ps1`). Start the stack in WSL: `ros2 launch vr_robot_pkg vr_robot_bringup.launch.py map:=scene_house` (or `mock_mode:=true` without CoppeliaSim). The bridge turns CoppeliaSim's display off while it runs and the simulation runs at ~0.7–0.87× real time.
+- `scene_house.ttt` now contains `/myRobot` (P3-DX), `/myRobot/frontCamera`, respondable house shapes, real-time mode and a depth-camera laser (prepared by the WSL scripts `scripts/coppelia/prepare_scene_house.py` / `install_fast_laser.py`); the Stage 1 streamer syncs the robot pose automatically.
 
 ## Language
 Everything committed to the repositories is in **English**: code, comments, log/UI strings, documentation, file and folder names, and commit messages.
 
 ## Repositories and division of work
-- **Windows (this folder), repo `IA368_final_project`** (`git@github.com:MateusHSAraujo/IA368_final_project.git`): Unity project, CoppeliaSim scripts and scenes, planning documents. Agent: **Claude Code on Windows** — Unity and CoppeliaSim sides of Layer 1 (ZMQ scene converter). Stage 1 is done (no VR, tested in Play mode on the PC).
-- **WSL2 (Ubuntu 24.04), repo `IA368_final_project_ros2`** (`git@github.com:MateusHSAraujo/IA368_final_project_ros2.git`) in `/home/mateus/ia368/projeto_final` (from Windows: `\\wsl.localhost\Ubuntu-24.04\home\mateus\ia368\projeto_final`): ROS 2 Jazzy, Nav2, slam_toolbox. Agent: **Claude Code on WSL**. Its planning documents are symlinks into `windows_workspace/` (this folder), so edits made there land here and are committed in this repository.
-- VR (Meta Quest 3, Meta XR SDK) is being added now: the VR rig replaces the `Desktop/` module and consumes `SimWorldRegistry`.
+- **Windows (this folder), repo `IA368_final_project`** (`git@github.com:MateusHSAraujo/IA368_final_project.git`): Unity project, CoppeliaSim scripts and scenes, planning documents. Agent: **Claude Code on Windows** — Unity (Layer 1 converter, VR, HMI) and CoppeliaSim sides.
+- **WSL2 (Ubuntu 24.04), repo `IA368_final_project_ros2`** (`git@github.com:MateusHSAraujo/IA368_final_project_ros2.git`) in `/home/mateus/ia368/projeto_final` (from Windows: `\\wsl.localhost\Ubuntu-24.04\home\mateus\ia368\projeto_final`): ROS 2 Jazzy, Nav2, slam_toolbox, bridge and mission supervisor. Agent: **Claude Code on WSL** (its own `CLAUDE.md` there). Its planning documents are symlinks into `windows_workspace/` (this folder), so edits made there land here and are committed in this repository (the WSL agent never commits this repo).
+- To inspect the WSL repo from Windows use `wsl.exe -d Ubuntu-24.04 -- bash -lc '...'`: Git over the `\\wsl.localhost` path reports "dubious ownership" and shows the symlinked documents as modified (artifact).
+- The VR rig (Meta Quest 3, Meta XR SDK) replaces the `Desktop/` module in `VrScene` and consumes `SimWorldRegistry`.
 
 ## Git
 - Remotes use SSH; the SSH keys work without prompting on both Windows and WSL.
@@ -29,6 +41,7 @@ Everything committed to the repositories is in **English**: code, comments, log/
 ## Locations
 - Unity project: `My project/` — Unity **6000.0.44f1**, URP, Input System (Active Input Handling = Input System Package only). Project code in `My project/Assets/_Project/` (Core / SimWorld / Desktop, each with an asmdef; XR module in progress; HMI will come in Stages 4–6).
 - XR: `com.meta.xr.sdk.core` 201.0.0, `com.meta.xr.sdk.interaction.ovr` 207.0.1, OpenXR 1.19.0 (loader on Standalone and Android, MetaXRFeature, Oculus Touch profile, Single Pass Instanced). Active build profile: `Assets/Settings/Build Profiles/New Meta Quest Profile.asset` (Android). Editor Play mode uses the **Standalone** XR settings but renders with the Android quality level (`Mobile_RPAsset`).
+- ROS: `com.unity.robotics.ros-tcp-connector` v0.7.0 (git URL `https://github.com/Unity-Technologies/ROS-TCP-Connector.git?path=/com.unity.robotics.ros-tcp-connector#v0.7.0`, matching ROS-TCP-Endpoint v0.7.0). Protocol ROS2 = scripting define `ROS2` on Standalone and Android (what Robotics > ROS Settings toggles; without it the built-in messages are the ROS1 variants, e.g. `Header.seq`). Changing defines triggers a full recompile of several minutes. Default `ROSConnection` endpoint `127.0.0.1:10000`.
 - Meta XR Simulator v207.1 in `C:\Program Files\MetaXRSimulator\v207.1`, activated through `XR_RUNTIME_JSON` (menu Meta > Meta XR Simulator).
 - CoppeliaSim scripts: `coppelia_scripts/`. Scenes: `scene_house/scene_house.ttt` (reference) and `scene_house/p3dx_nav2.ttt`.
 - **Windows is the master copy** of `My project/`, `coppelia_scripts/`, `scene_house/` and the planning documents. The WSL `sync_to_windows.sh` copies only `scripts/*.ps1`.
@@ -72,7 +85,7 @@ Everything committed to the repositories is in **English**: code, comments, log/
 - The skills mention a `unity` CLI (Unity Editor Pipeline bridge); in this project, Editor edits go through `unity-mcp` instead.
 
 ## `scene_house.ttt` data
-117 objects (52 shapes, 45 dummies, 9 joints, 7 cameras, 4 lights), no `/myRobot`; the streamer exports 106 (no cameras/lights). 944 mesh components (`kitchnet` 482, `kitchen_drawer` 209), 246,748 vertices / 1,344,471 indices (~448k triangles; `coffee_maker` has 229k). Normals and UVs **per triangle corner**, 0-based indices. 16 textures (unique ids) up to 512×512. Roof and `ResizableFloorLarge` invisible. **Every shape has the `static` flag**, including doors attached to joints → detect motion by pose changes.
+Original house (Stage 1 measurements): 117 objects (52 shapes, 45 dummies, 9 joints, 7 cameras, 4 lights), no `/myRobot`; the streamer exports 106 (no cameras/lights). Since 2026-11-13 the scene also holds `/myRobot` with its camera and laser (see "Unity ↔ ROS 2 interface"), so the counts are higher. 944 mesh components (`kitchnet` 482, `kitchen_drawer` 209), 246,748 vertices / 1,344,471 indices (~448k triangles; `coffee_maker` has 229k). Normals and UVs **per triangle corner**, 0-based indices. 16 textures (unique ids) up to 512×512. Roof and `ResizableFloorLarge` invisible. **Every shape has the `static` flag**, including doors attached to joints → detect motion by pose changes.
 
 ## VR locomotion (practical lessons)
 - Meta's `CharacterController` uses `CapsuleCast`, which ignores colliders the capsule already overlaps: the player can slip into thin, non-convex meshes. A recovery guard is needed (`VrPlayerBootstrap`).
