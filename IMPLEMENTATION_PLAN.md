@@ -275,7 +275,7 @@ Create and build the `ros2_ws` workspace with `vr_robot_pkg` and `ROS-TCP-Endpoi
 #### Goal
 > **Revised scope:** the Meta Interaction SDK (Building Blocks, `com.meta.xr.sdk.interaction.ovr` 207.0.1) replaces the XR Interaction Toolkit (`XRGrabInteractable` etc. become Meta `Grabbable`/`HandGrabInteractable` later).
 > - [x] **VR locomotion (walk, snap turn, teleport on a runtime NavMesh), VR menu shell with a Settings page (fly mode, height) and start flow — done** (committed `27425d3`), see `STAGE4_VR_LOCOMOTION_PLAN.md`. The existing `VrMenu` (Meta ray-interactable canvas with pages) is the base for the Spatial Menu.
-> - [ ] VR Spatial Menu (below): **in progress** together with the Unity side of Stage 5, see `STAGE5_TACTICAL_TABLE_PLAN.md`. ROS-TCP-Connector v0.7.0 (protocol ROS2, matching the endpoint) installed in the Unity project on 2026-11-15.
+> - [x] VR Spatial Menu (below): **done** together with the Unity side of Stage 5 (committed `ba557bc`), see `STAGE5_TACTICAL_TABLE_PLAN.md`. ROS-TCP-Connector v0.7.0 (protocol ROS2, matching the endpoint) installed in the Unity project on 2026-11-15.
 
 Configure avatar locomotion and implement the **VR Spatial Menu** (`VRModeAndMissionMenu.cs`), from which the user can open/close the Holographic Tactical Table, select navigation tools and control the mission.
 
@@ -326,7 +326,7 @@ Implement the **Holographic Tactical Table** in Unity (invoked from the menu, ma
 * Run `pytest tests/test_mission_supervisor.py` with *Mock Action Servers* for `NavigateToPose` and `NavigateThroughPoses`.
 * Run `bash scripts/sync_to_windows.sh`.
 
-#### Stage 5 status — **ROS side done** (2026-11-14, WSL repo; validated live against `scene_house.ttt`). Unity side (table, painters) **in progress**, see `STAGE5_TACTICAL_TABLE_PLAN.md`.
+#### Stage 5 status — **ROS side done** (2026-11-14, WSL repo; validated live against `scene_house.ttt`). Unity side (table, painters) **done** (2026-11-15, committed `ba557bc`), see `STAGE5_TACTICAL_TABLE_PLAN.md`.
 **The Unity-facing contract is in the WSL repo: `ros2_ws/src/vr_robot_pkg/README.md`, sections "HMI topics (mission supervisor)" and "Saved maps".**
 * `mission_supervisor_node` is the only node Unity talks to: `/hmi/goal` (PoseStamped → NavigateToPose), `/hmi/path` (Path → NavigateThroughPoses, thinned to waypoints ≥ 0.3 m), `/hmi/mission_cmd` (`PAUSE`/`RESUME`/`CANCEL`), `/hmi/keepout_stroke` (PolygonStamped, `z` = brush radius, empty clears) → `/keepout_filter_mask`, state in `/hmi/mission_state` (JSON). A nonzero `/cmd_vel_teleop` auto-pauses the mission (twist_mux routing is Stage 6).
 * **Saved maps (new):** `/hmi/map_cmd` `SAVE <name>` / `LOAD <name>` / `RESET`, state in `/hmi/map_state` (JSON, includes the list of saved maps). Keepout zones are saved with the map. A reference map of the whole house, `scene_house`, is committed; `ros2 launch vr_robot_pkg vr_robot_bringup.launch.py map:=scene_house` loads it about 8 s after startup, so a session can go straight to the table without driving the robot around.
