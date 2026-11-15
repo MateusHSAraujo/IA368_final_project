@@ -1,6 +1,7 @@
 using System;
 using System.Globalization;
 using TMPro;
+using VRRobot.XR;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -18,6 +19,7 @@ namespace VRRobot.HMI
         [Header("Status")]
         [SerializeField] TMP_Text _mapLabel;
         [SerializeField] TMP_Text _resultLabel;
+        [SerializeField, Tooltip("Optional chip showing the map state.")] StatusChip _mapChip;
 
         [Header("Saved maps (one slot per row)")]
         [SerializeField] TMP_Text[] _rowLabels;
@@ -153,6 +155,14 @@ namespace VRRobot.HMI
                 _mapLabel.text = s != null ? $"Map: {s.map ?? "-"} ({s.state})"
                                            : (_ros == null ? "ROS: not available" : "Map: no data");
                 _mapLabel.color = _ros != null && _ros.IsConnected ? Color.white : Bad;
+            }
+            if (_mapChip != null)
+            {
+                if (s == null || _ros == null || !_ros.IsConnected) _mapChip.Set(s == null ? "No data" : "Offline", StatusChip.Level.Neutral);
+                else if (!s.ok && !string.IsNullOrEmpty(s.message)) _mapChip.Set("Failed", StatusChip.Level.Error);
+                else if (s.IsBusy) _mapChip.Set("Busy", StatusChip.Level.Warn);
+                else if (s.state == "READY") _mapChip.Set("Ready", StatusChip.Level.Ok);
+                else _mapChip.Set(s.state ?? "-", StatusChip.Level.Neutral);
             }
             if (_resultLabel != null)
             {

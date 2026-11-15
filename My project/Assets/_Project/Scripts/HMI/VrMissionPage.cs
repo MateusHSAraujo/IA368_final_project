@@ -1,5 +1,6 @@
 using System.Globalization;
 using TMPro;
+using VRRobot.XR;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -21,11 +22,11 @@ namespace VRRobot.HMI
         [SerializeField] TMP_Text _tableLabel;
 
         [Header("Tools (None, Goal, Path, No-go)")]
-        [SerializeField] Button[] _toolButtons;
+        [SerializeField] Toggle[] _toolButtons;
 
         [Header("Brush (S, M, L)")]
         [SerializeField, Tooltip("Row that is visible only with the No-go tool.")] GameObject _brushRow;
-        [SerializeField] Button[] _brushButtons;
+        [SerializeField] Toggle[] _brushButtons;
         [SerializeField] TMP_Text[] _brushLabels;
 
         [Header("Mission control")]
@@ -37,11 +38,15 @@ namespace VRRobot.HMI
         [SerializeField] TMP_Text _rosLabel;
         [SerializeField] TMP_Text _missionLabel;
         [SerializeField] TMP_Text _messageLabel;
+        [SerializeField, Tooltip("Optional chips; when assigned they show the ROS and mission state.")] StatusChip _rosChip;
+        [SerializeField] StatusChip _missionChip;
 
         static readonly Color Ok = new Color(0.75f, 1f, 0.75f);
         static readonly Color Bad = new Color(1f, 0.45f, 0.4f);
 
         RosHmiClient _ros;
+        bool _syncing;      // true while code sets toggles (see UiToggles)
+        bool _resyncTools;  // a toggle changed by the user; re-apply the tool/brush state after the event
 
         void Awake()
         {
@@ -52,12 +57,22 @@ namespace VRRobot.HMI
             for (int i = 0; i < _toolButtons.Length; i++)
             {
                 var tool = (TacticalTool)i;
-                if (_toolButtons[i] != null) _toolButtons[i].onClick.AddListener(() => { if (_tools != null) _tools.SetTool(tool); });
+                if (_toolButtons[i] != null) _toolButtons[i].onValueChanged.AddListener(on =>
+                {
+                    if (_syncing) return;
+                    if (on && _tools != null) _tools.SetTool(tool);
+                    _resyncTools = true; // turning the active tool off is undone in LateUpdate
+                });
             }
             for (int i = 0; i < _brushButtons.Length; i++)
             {
                 int index = i;
-                if (_brushButtons[i] != null) _brushButtons[i].onClick.AddListener(() => { if (_tools != null) _tools.SetBrush(index); });
+                if (_brushButtons[i] != null) _brushButtons[i].onValueChanged.AddListener(on =>
+                {
+                    if (_syncing) return;
+                    if (on && _tools != null) _tools.SetBrush(index);
+                    _resyncTools = true;
+                });
             }
             if (_pauseButton != null) _pauseButton.onClick.AddListener(() => Send("PAUSE"));
             if (_resumeButton != null) _resumeButton.onClick.AddListener(() => Send("RESUME"));
@@ -99,6 +114,15 @@ namespace VRRobot.HMI
             _ros = null;
         }
 
+        // Re-applied outside the toggle callbacks: setting a toggle inside its own onValueChanged would reach the
+        // UI Set's highlight listener in the wrong order.
+        void LateUpdate()
+        {
+            if (!_resyncTools) return;
+            _resyncTools = false;
+            RefreshTools();
+        }
+
         void Send(string cmd)
         {
             if (_ros != null) _ros.SendMissionCmd(cmd);
@@ -128,7 +152,11 @@ namespace VRRobot.HMI
         {
             var current = _tools != null ? _tools.Tool : TacticalTool.None;
             for (int i = 0; i < _toolButtons.Length; i++)
-                if (_toolButtons[i] != null) _toolButtons[i].interactable = _tools != null && i != (int)current;
+            {
+                if (_toolButtons[i] == null) continue;
+                _toolButtons[i].interactable = _tools != null;
+                UiToggles.Set(_toolButtons[i], i == (int)current, ref _syncing);
+            }
 
             if (_brushRow != null) _brushRow.SetActive(_tools != null && current == TacticalTool.NoGo);
             if (_tools == null) return;
@@ -137,7 +165,7 @@ namespace VRRobot.HMI
                 if (_brushButtons[i] == null) continue;
                 bool exists = i < _tools.BrushCount;
                 _brushButtons[i].gameObject.SetActive(exists);
-                _brushButtons[i].interactable = i != _tools.BrushIndex;
+                UiToggles.Set(_brushButtons[i], i == _tools.BrushIndex, ref _syncing);
                 if (exists && i < _brushLabels.Length && _brushLabels[i] != null)
                 {
                     float r = _tools.BrushRadiusAt(i);
@@ -145,6 +173,24 @@ namespace VRRobot.HMI
                 }
             }
         }
+
+        static StatusChip.Level MissionLevel(string state)
+        {
+            switch (state.ToUpperInvariant())
+            {
+                case "NAVIGATING": return StatusChip.Level.Ok;
+                case "PAUSED": return StatusChip.Level.Warn;
+                case "FAILED":
+                case "CANCELED":
+                case "CANCELLED":
+                case "ABORTED":
+                case "REJECTED":
+                case "ERROR": return StatusChip.Level.Error;
+                default: return StatusChip.Level.Neutral;
+            }
+        }
+
+        static string TitleCase(string s) => s.Length == 0 ? s : char.ToUpperInvariant(s[0]) + s.Substring(1).ToLowerInvariant();
 
         /// <summary>Refreshes the ROS, mission and mission-control state.</summary>
         void RefreshStatus()
@@ -166,6 +212,20 @@ namespace VRRobot.HMI
                     _rosLabel.text = $"ROS: {(connected ? "connected" : "disconnected")} | Bridge: {bridge}";
                     _rosLabel.color = connected && bridge == "connected" ? Ok : Bad;
                 }
+            }
+
+            if (_rosChip != null)
+            {
+                if (_ros == null) _rosChip.Set("Unavailable", StatusChip.Level.Error);
+                else if (!connected) _rosChip.Set("Disconnected", StatusChip.Level.Error);
+                else if (string.IsNullOrEmpty(_ros.BridgeStatus)) _rosChip.Set("Connected", StatusChip.Level.Warn);
+                else if (_ros.BridgeStatus == "connected") _rosChip.Set("Connected", StatusChip.Level.Ok);
+                else _rosChip.Set("Bridge " + _ros.BridgeStatus, StatusChip.Level.Warn);
+            }
+            if (_missionChip != null)
+            {
+                if (m == null || string.IsNullOrEmpty(m.state)) _missionChip.Set("-", StatusChip.Level.Neutral);
+                else _missionChip.Set(TitleCase(m.state), MissionLevel(m.state));
             }
 
             if (_missionLabel != null)

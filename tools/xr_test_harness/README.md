@@ -22,7 +22,7 @@ Unity never compiles the C# snippets.
 ## Spec syntax
 | Spec | Target |
 |---|---|
-| `button:<exact GameObject name>` | active `UI.Button` with that name |
+| `button:<exact GameObject name>` | active `UI.Selectable` (Button or Toggle) with that name, aimed at its rect centre |
 | `map:x;y` | ROS map point on the tactical table |
 | `floor:x;y` | ROS map point on the real floor |
 | `bar:offset;up` | nearest table frame bar + `offset` m along the table right axis (+ `up` m) |

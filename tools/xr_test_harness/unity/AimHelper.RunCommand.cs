@@ -38,8 +38,13 @@ internal class CommandScript : IRunCommand
         switch (kind)
         {
             case "button":
-                foreach (var b in Object.FindObjectsByType<UnityEngine.UI.Button>(FindObjectsSortMode.None))
-                    if (b.gameObject.activeInHierarchy && b.gameObject.name == arg) return b.transform.position;
+                // Any Selectable (Button or Toggle: the UI Set tabs, tools and brush are toggles); aim at the rect centre.
+                foreach (var b in Object.FindObjectsByType<UnityEngine.UI.Selectable>(FindObjectsSortMode.None))
+                    if (b.gameObject.activeInHierarchy && b.gameObject.name == arg)
+                    {
+                        var rt = b.transform as RectTransform;
+                        return rt != null ? rt.TransformPoint(rt.rect.center) : b.transform.position;
+                    }
                 return null;
             case "map":
             {

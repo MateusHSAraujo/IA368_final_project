@@ -15,7 +15,7 @@ namespace VRRobot.XR
         public class Page
         {
             public string name;
-            public Button tab;
+            public Toggle tab;
             public GameObject root;
         }
 
@@ -30,6 +30,9 @@ namespace VRRobot.XR
         [SerializeField] OVRInput.Button _toggleButton = OVRInput.Button.Start;
 
         int _current;
+        int _requestedPage = -1;
+        bool _syncing;     // true while code sets the tab toggles (see UiToggles)
+        bool _resyncTabs;  // a tab toggle changed by the user; applied after the event
         Vector3 _lastOriginPosition;
         float _lastOriginYaw;
 
@@ -41,7 +44,13 @@ namespace VRRobot.XR
             for (int i = 0; i < _pages.Length; i++)
             {
                 int index = i;
-                if (_pages[i].tab != null) _pages[i].tab.onClick.AddListener(() => ShowPage(index));
+                if (_pages[i].tab != null)
+                    _pages[i].tab.onValueChanged.AddListener(on =>
+                    {
+                        if (_syncing) return;
+                        if (on) _requestedPage = index;
+                        _resyncTabs = true; // applied in LateUpdate; the active tab cannot be turned off
+                    });
             }
             _panel.SetActive(false);
         }
@@ -59,6 +68,14 @@ namespace VRRobot.XR
         // The locomotor re-places the rig late in the frame; a one-frame lag here is not noticeable.
         void LateUpdate()
         {
+            if (_resyncTabs)
+            {
+                // Outside the toggle callback: setting a toggle inside its own onValueChanged would reach the
+                // UI Set's highlight listener in the wrong order.
+                _resyncTabs = false;
+                ShowPage(_requestedPage >= 0 ? _requestedPage : _current);
+                _requestedPage = -1;
+            }
             if (!IsOpen || _playerOrigin == null) return;
             var delta = _playerOrigin.position - _lastOriginPosition;
             float yaw = _playerOrigin.eulerAngles.y;
@@ -111,7 +128,7 @@ namespace VRRobot.XR
             for (int i = 0; i < _pages.Length; i++)
             {
                 if (_pages[i].root != null) _pages[i].root.SetActive(i == index);
-                if (_pages[i].tab != null) _pages[i].tab.interactable = i != index;
+                UiToggles.Set(_pages[i].tab, i == index, ref _syncing);
             }
         }
     }

@@ -24,7 +24,7 @@ namespace VRRobot.XR
 
         void Awake()
         {
-            _flyToggle.onValueChanged.AddListener(v => _flyMode.SetFlying(v));
+            _flyToggle.onValueChanged.AddListener(v => { if (!_syncing) _flyMode.SetFlying(v); });
             if (_height == null) return;
             if (_heightDown != null) _heightDown.onClick.AddListener(_height.Decrease);
             if (_heightUp != null) _heightUp.onClick.AddListener(_height.Increase);
@@ -33,7 +33,7 @@ namespace VRRobot.XR
 
         void OnEnable()
         {
-            _flyToggle.SetIsOnWithoutNotify(_flyMode.IsFlying);
+            UiToggles.Set(_flyToggle, _flyMode.IsFlying, ref _syncing);
             _flyMode.FlyingChanged += OnFlyingChanged;
             if (_height != null)
             {
@@ -48,7 +48,9 @@ namespace VRRobot.XR
             if (_height != null) _height.Changed -= OnHeightChanged;
         }
 
-        void OnFlyingChanged(bool on) => _flyToggle.SetIsOnWithoutNotify(on);
+        void OnFlyingChanged(bool on) => UiToggles.Set(_flyToggle, on, ref _syncing);
+
+        bool _syncing; // true while code sets the fly toggle (see UiToggles)
 
         void OnHeightChanged(float offset)
         {

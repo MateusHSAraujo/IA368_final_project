@@ -156,6 +156,19 @@ Meta XR Operator MCP at `http://127.0.0.1:8720/mcp` while in Play mode: `openxr_
 - Map (`VrMapPage`): saved maps list with Load; Save as new `map_YYYYMMDD_HHMM`; Overwrite current; Reset map and Clear no-go zones, each with a two-step confirm. Buttons are disabled while BUSY or disconnected.
 - Settings: as described in the VR menu section above.
 
+### UI theme (Meta UI Set)
+- Both menus (`StartMenu.prefab`, `VrMenu.prefab`) follow Meta's Interaction SDK **UI Set** (`Packages/com.meta.xr.sdk.interaction/Runtime/Sample/Objects/UISet`), the reference for every new panel.
+- Each menu root has Meta's `UIThemeManager` with `UIThemeQuest_Dark`. In `Start` it applies the theme to all children, driven by `QDSUI*` tags:
+  - backplate (`QDSUIBackplateGradient`, material `RoundedBoxGradientUIDark`), section plates (`QDSUISection`), accent (`QDSUIAccentColor`);
+  - button state colors through Animator controllers chosen by tag (Primary / Secondary / Destructive / ToggleButton / ToggleSwitch);
+  - **every TMP text gets the theme font** (LiberationSans in the package theme) and the primary or secondary (`QDSUITextSecondaryColor`) color. `QDSUISharedThemeColor` objects are left alone (status chips).
+- `UiTextRole` (`Scripts/XR`, runs after the manager) re-applies the project fonts and sizes from `Assets/_Project/UI/UiTextStyles.asset`: Title (Roboto Bold 26), Heading (Bold 18), Body (Regular 18), Caption (Regular 15), Label (Medium 18, button labels). Change sizes there; every text in both menus has a role.
+- Components (nested instances of the UI Set prefabs): Primary (Open table, Load scene, OK), Destructive (Cancel, Reset map, Clear no-go zones), Secondary (everything else), `TextTileButton_IconAndLabel_Toggle` for tabs, tools and brush (visual on state = selected), `ToggleButton_Switch` for fly mode. Icons come from `Runtime/Sample/Textures/OCUIIconSet`. Rounded corners: material `RoundedBoxUI` + `RoundedBoxUIProperties`.
+- Selection uses `Toggle.isOn` (tabs, tools, brush), not `interactable = false`; `interactable` only means "unavailable". No `ToggleGroup`: the page scripts keep exactly one toggle on. Code sets toggles through `UiToggles.Set` (with notification, under a guard flag), because the UI Set highlight (`AnimatorOverrideLayerWeight`) ignores `SetIsOnWithoutNotify`; a click on the active item is undone in `LateUpdate`.
+- `StatusChip` (`Scripts/XR`): rounded colored chip for the ROS, mission and map states (Ok green, Warn amber, Error red, Neutral gray).
+- Layout: canvas scale 0.001 (UI Set units), pages are `VerticalLayoutGroup`s of sections; the panel height fits the tallest page (VrMenu 520×749, StartMenu 560×306).
+- Editing the menu pages in the Editor: in Prefab Mode, Map Page and Settings Page are simply inactive; activate the one you want to edit (and deactivate Mission Page). The saved active state does not matter, `VrMenuController.ShowPage` sets it at runtime. Button colors only show their final look in Play mode (Animator).
+
 ### Runtime testing
 - Start the stack: `ros2 launch vr_robot_pkg vr_robot_bringup.launch.py map:=scene_house`. The saved house map loads ~8 s after start; no exploration is needed.
 - Aim the right ray by rotating the simulated grip: the ISDK ray and the distance-grab `SelectionFrustum` follow the grip in the simulator.
