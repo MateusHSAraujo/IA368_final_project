@@ -1,0 +1,50 @@
+// Temporary editor script that runs the EditMode tests (TestRunnerApi cannot be run directly from
+// Unity_RunCommand: "User interactions are not supported").
+//
+// Procedure:
+//  1. Copy to Assets/_Project/Editor/Temp/RunEditModeTests.cs and refresh the AssetDatabase.
+//  2. EditorApplication.ExecuteMenuItem("Tools/VRRobot Temp/Run EditMode Tests").
+//  3. Poll <temp>/xr_harness/editmode_result.txt ("passed=.. failed=.. skipped=.." + "FAIL <name>: <message>" lines).
+//  4. DELETE the script, its .meta and the (now empty) Assets/_Project/Editor folder.
+using System.Text;
+using UnityEngine;
+using UnityEditor;
+using UnityEditor.TestTools.TestRunner.Api;
+
+public static class RunEditModeTests
+{
+    class Cb : ICallbacks
+    {
+        public void RunStarted(ITestAdaptor testsToRun) { }
+        public void TestStarted(ITestAdaptor test) { }
+        public void TestFinished(ITestResultAdaptor result) { }
+
+        public void RunFinished(ITestResultAdaptor result)
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("passed=" + result.PassCount + " failed=" + result.FailCount + " skipped=" + result.SkipCount);
+            Collect(result, sb);
+            string dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "xr_harness");
+            System.IO.Directory.CreateDirectory(dir);
+            System.IO.File.WriteAllText(System.IO.Path.Combine(dir, "editmode_result.txt"), sb.ToString());
+        }
+
+        static void Collect(ITestResultAdaptor r, StringBuilder sb)
+        {
+            if (!r.HasChildren)
+            {
+                if (r.TestStatus == TestStatus.Failed) sb.AppendLine("FAIL " + r.Test.FullName + ": " + r.Message);
+                return;
+            }
+            foreach (var c in r.Children) Collect(c, sb);
+        }
+    }
+
+    [MenuItem("Tools/VRRobot Temp/Run EditMode Tests")]
+    public static void Run()
+    {
+        var api = ScriptableObject.CreateInstance<TestRunnerApi>();
+        api.RegisterCallbacks(new Cb());
+        api.Execute(new ExecutionSettings(new Filter { testMode = TestMode.EditMode }) { runSynchronously = false });
+    }
+}

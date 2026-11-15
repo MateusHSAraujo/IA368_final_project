@@ -118,6 +118,50 @@ Meta XR Operator MCP at `http://127.0.0.1:8720/mcp` while in Play mode: `openxr_
 - Left Menu button: `openxr_set_controller_input` with component "Menu". Trigger: component "Trigger" (no `sub_component`); sticks: "Thumbstick" with `sub_component` "X"/"Y".
 - Simpler ray aiming: read the right `ControllerRayInteractor`'s `_rayOrigin` (position/forward) in Unity, compute the world rotation that turns that forward toward the target, convert it to OpenXR and pre-multiply it into the current grip orientation (`openxr_get_controller_pose`); one refinement step lands within a few pixels.
 
+## HMI (Stage 4 Spatial Menu + Stage 5 tactical table)
+### Module and ROS link
+- Module `Assets/_Project/Scripts/HMI/`, asmdef `VRRobot.HMI` (refs: VRRobot.Core, VRRobot.SimWorld, VRRobot.XR, Oculus.Interaction, Oculus.VR, UnityEngine.UI, Unity.TextMeshPro, Unity.Robotics.ROSTCPConnector, `.Messages`, `.MessageGeneration`).
+- Pure math in `Scripts/Core/MapGridMath.cs` (EditMode tests `MapGridMathTests`, `HmiJsonTests`; suite 41/41).
+- Scene objects in `VrScene`:
+  - `ROS Connection`: `ROSConnection` at 127.0.0.1:10000, protocol ROS2 (`ROS2` define), HUD off, TF listening off.
+  - `HMI`: `RosHmiClient`, the only owner of ROS I/O. Raises its events on the main thread.
+- Contract: WSL repo `ros2_ws/src/vr_robot_pkg/README.md`.
+- Subscribes: `/hmi/map`, `/hmi/keepout_mask`, `/hmi/robot_pose`, `/plan`, `/hmi/mission_state`, `/hmi/map_state`, `/myRobot/bridge_status`.
+  - `/hmi/map` and `/hmi/keepout_mask` are volatile copies republished by the mission supervisor. ROS-TCP-Endpoint subscribes volatile and cannot receive the transient_local `/map` or `/keepout_filter_mask`; slam_toolbox publishes `/map` only when the map changes.
+- Publishes: `/hmi/goal` (zero quaternion = face the direction of travel), `/hmi/path`, `/hmi/mission_cmd`, `/hmi/keepout_stroke` (`z` = brush radius, empty = clear), `/hmi/map_cmd`.
+- Logs use the `[HMI]` prefix.
+
+### Holographic Tactical Table
+- Prefab `Assets/_Project/Prefabs/TacticalTable.prefab`, component `HolographicTacticalTable`. A true miniature of the world (map frame = Unity world), longest map side 1 m.
+- Visuals are built at runtime under `Content`: map texture (`OccupancyGridTexture`, `GridQuadMesh`), keepout overlay, robot avatar from `/hmi/robot_pose`, `/plan` line, goal ring, tool previews, status text. Rebuilt on every `/hmi/map` (size or origin change).
+- `Open()`: near edge 0.3 m in front of the eyes, 0.45 m below them. Content is turned 90° when the map is deeper than wide.
+- Grab: Meta Quick Action distance grab (`ManipulateInPlace`, `MoveAtSourceProvider`) on the root, with the controller grip. `GrabFreeTransformer` gives yaw only for one hand and uniform scale 0.5-3x for two hands.
+- All table colliders are triggers, so the CharacterController, the recovery guard and `CapsuleClearance` ignore them.
+- The frame bars are active from the first frame and the content stays active during it, because `DistanceGrabInteractable` caches its colliders once in `Start`. The grab interaction object is active only while the table is open (`_activeWhileOpen`).
+
+### Tools and pointer
+- `HMI/Tools` = `TacticalToolController`; `HMI/Pointer` = `HmiPointer`.
+- Pointer: right ISDK `ControllerRayInteractor` origin and forward, right trigger (hysteresis 0.55 / 0.35). It yields while the ISDK ray hovers UI and is off while flying.
+- Hit resolution: table surface → map point; SimWorld collider with up normal and height < 0.15 m → floor point; anything else → blocked (red).
+- Goal: click on a free cell (table or floor).
+- Path: hold and drag; samples ≥ 5 cm apart; sent if length ≥ 0.3 m.
+- No-go brush: radius 0.15 / 0.30 / 0.50 m; samples every radius/2.
+- While a stroke is held, `LocomotionInputGate` is held.
+
+### World overlay
+- `HMI/World Overlay` (`WorldOverlay`): `/plan`, goal ring, active path and keepout mask drawn on the house floor (y 0.02-0.03).
+
+### VR menu tabs
+- Mission (`VrMissionPage`): open/close table, tool and brush, Pause / Resume / Cancel enabled by mission state, mission and ROS/bridge status, disabled Stage 6 teleop button.
+- Map (`VrMapPage`): saved maps list with Load; Save as new `map_YYYYMMDD_HHMM`; Overwrite current; Reset map and Clear no-go zones, each with a two-step confirm. Buttons are disabled while BUSY or disconnected.
+- Settings: as described in the VR menu section above.
+
+### Runtime testing
+- Start the stack: `ros2 launch vr_robot_pkg vr_robot_bringup.launch.py map:=scene_house`. The saved house map loads ~8 s after start; no exploration is needed.
+- Aim the right ray by rotating the simulated grip: the ISDK ray and the distance-grab `SelectionFrustum` follow the grip in the simulator.
+- Hold Grip across frames for the distance grab.
+- The composited-image capture can return a stale frame; rendering `CenterEyeAnchor` (or a temporary camera) into a RenderTexture is reliable.
+
 ## Known issues / notes
 - **Unfocused Editor**: without focus, Unity may stop advancing frames in Play mode. With the Editor focused (normal use) this does not happen. `PlayerSettings.runInBackground` is on.
 - Color/mesh changes of an existing shape are not detected (only objects being added/removed/reparented, and poses). Use **Reload scene**.
