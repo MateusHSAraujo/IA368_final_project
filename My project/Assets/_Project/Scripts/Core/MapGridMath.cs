@@ -18,7 +18,7 @@ namespace VRRobot.Core
         public Vector2 Size => new Vector2(Width * Resolution, Height * Resolution);
     }
 
-    /// <summary>Pure math for occupancy grids, map/world/table conversions and stroke sampling.</summary>
+    /// <summary>Pure math for occupancy grids, map/world/panel conversions and stroke sampling.</summary>
     public static class MapGridMath
     {
         public static Vector3 MapToWorld(Vector2 mapXY, float height = 0f) =>
@@ -60,11 +60,11 @@ namespace VRRobot.Core
         /// <summary>Unity world extent (x, z) of the grid: Unity x = -y_ros, Unity z = x_ros.</summary>
         public static Vector2 WorldSizeXZ(GridInfo g) => new Vector2(g.Height * g.Resolution, g.Width * g.Resolution);
 
-        public static Vector3 WorldToTableLocal(Vector3 world, Vector3 worldCenter, float scale) =>
+        public static Vector3 WorldToPanelLocal(Vector3 world, Vector3 worldCenter, float scale) =>
             (world - worldCenter) * scale;
 
         /// <param name="scale">Must be greater than zero.</param>
-        public static Vector3 TableLocalToWorld(Vector3 local, Vector3 worldCenter, float scale) =>
+        public static Vector3 PanelLocalToWorld(Vector3 local, Vector3 worldCenter, float scale) =>
             local / scale + worldCenter;
 
         /// <summary>

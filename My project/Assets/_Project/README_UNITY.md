@@ -118,10 +118,10 @@ Meta XR Operator MCP at `http://127.0.0.1:8720/mcp` while in Play mode: `openxr_
 - Left Menu button: `openxr_set_controller_input` with component "Menu". Trigger: component "Trigger" (no `sub_component`); sticks: "Thumbstick" with `sub_component` "X"/"Y".
 - Simpler ray aiming: read the right `ControllerRayInteractor`'s `_rayOrigin` (position/forward) in Unity, compute the world rotation that turns that forward toward the target, convert it to OpenXR and pre-multiply it into the current grip orientation (`openxr_get_controller_pose`); one refinement step lands within a few pixels.
 
-## HMI (Stage 4 Spatial Menu + Stage 5 tactical table)
+## HMI (Stage 4 Spatial Menu + Stage 5 operations panel)
 ### Module and ROS link
 - Module `Assets/_Project/Scripts/HMI/`, asmdef `VRRobot.HMI` (refs: VRRobot.Core, VRRobot.SimWorld, VRRobot.XR, Oculus.Interaction, Oculus.VR, UnityEngine.UI, Unity.TextMeshPro, Unity.Robotics.ROSTCPConnector, `.Messages`, `.MessageGeneration`).
-- Pure math in `Scripts/Core/MapGridMath.cs` (EditMode tests `MapGridMathTests`, `HmiJsonTests`; suite 41/41).
+- Pure math in `Scripts/Core/MapGridMath.cs` and `Scripts/Core/PanelMath.cs` (EditMode tests `MapGridMathTests`, `HmiJsonTests`, `PanelMathTests`; suite 51/51).
 - Scene objects in `VrScene`:
   - `ROS Connection`: `ROSConnection` at 127.0.0.1:10000, protocol ROS2 (`ROS2` define), HUD off, TF listening off.
   - `HMI`: `RosHmiClient`, the only owner of ROS I/O. Raises its events on the main thread.
@@ -131,19 +131,23 @@ Meta XR Operator MCP at `http://127.0.0.1:8720/mcp` while in Play mode: `openxr_
 - Publishes: `/hmi/goal` (zero quaternion = face the direction of travel), `/hmi/path`, `/hmi/mission_cmd`, `/hmi/keepout_stroke` (`z` = brush radius, empty = clear), `/hmi/map_cmd`.
 - Logs use the `[HMI]` prefix.
 
-### Holographic Tactical Table
-- Prefab `Assets/_Project/Prefabs/TacticalTable.prefab`, component `HolographicTacticalTable`. A true miniature of the world (map frame = Unity world), longest map side 1 m.
-- Visuals are built at runtime under `Content`: map texture (`OccupancyGridTexture`, `GridQuadMesh`), keepout overlay, robot avatar from `/hmi/robot_pose`, `/plan` line, goal ring, tool previews, status text. Rebuilt on every `/hmi/map` (size or origin change).
-- `Open()`: near edge 0.3 m in front of the eyes, 0.45 m below them. Content is turned 90° when the map is deeper than wide.
-- Grab: Meta Quick Action distance grab (`ManipulateInPlace`, `MoveAtSourceProvider`) on the root, with the controller grip. `GrabFreeTransformer` gives yaw only for one hand and uniform scale 0.5-3x for two hands.
-- All table colliders are triggers, so the CharacterController, the recovery guard and `CapsuleClearance` ignore them.
-- The frame bars are active from the first frame and the content stays active during it, because `DistanceGrabInteractable` caches its colliders once in `Start`. The grab interaction object is active only while the table is open (`_activeWhileOpen`).
+### Operations panel
+Formerly the "holographic tactical table" (renamed after the `todos.md` usability review, 2026-11-15).
+- Prefab `Assets/_Project/Prefabs/OperationsPanel.prefab`, component `OperationsPanel`. A miniature of the world (map frame = Unity world); longest map side `_panelSize` = 0.5 m at scale 1.
+- Hierarchy: the root is upright (its rotation is the grab's yaw and pitch, pitch 0 = vertical, 90 = lying face up). `Pivot` (rotated -90° about X) holds `Content`, `Toolbar` and `Handles`, so the miniature lies in the pivot's XZ plane (+Y towards the viewer, +Z up).
+- Visuals are **prefab objects** under `Content` (editable in Prefab Mode): `Surface` (map mesh, trigger `BoxCollider`, kinematic `Rigidbody`, `PanelSurface`), `Backdrop`, `Keepout`, `Frame/Near|Far|Left|Right`, `Avatar/Body|Heading`, `Status` (TMP). Only the map and keepout meshes, materials/textures and the tool feedback (plan line, goal ring, previews) are created at runtime. The component context menu **Apply Default Layout** lays frame, backdrop, status, toolbar and handles out around the default size (`_panelSize` × 0.64) in the Editor; `Awake` runs it too (an empty panel, before the first map or without ROS, can be grabbed and used), and every `/hmi/map` re-lays them out to the map. Content is turned 90° when the map is deeper than wide.
+- Open / close: **Y** (left controller, `_toggleButton`), the toolbar's X, or the Mission page button. `Open()` places it upright in front of the head, at the distance where frame + status + toolbar fit in 55° × 45° (`PanelMath.FitDistance`), centre 0.1 m below the eyes. It stays fixed in the world (does not follow locomotion). Scale resets to 1 on every open.
+- Toolbar (`Pivot/Toolbar`): a copy of the VR menu canvas (UI Set backplate, `UIThemeManager`, ISDK ray canvas) with a `ToolSelector`: tools None / Goal / Path / No-go, Close, and with No-go the brush row plus a full-width "Clear no-go zones" row (two-step confirm; `ToolSelector._clearRow`). Laid out under the near frame bar in `LayoutParts` (also in `Awake`, so it faces the viewer before the first map).
+- Frame grab: **ray grab with the trigger** on a frame bar. Each bar has a `ColliderSurface` + `RayInteractable` (in the prefab) pointing at the root `Grabbable`, movement `MoveAtSourceProvider` on `Frame Grab` (the panel follows the hand's translation and rotation). Transformer `PanelGrabTransformer` (one or two hands): yaw about world up + pitch about the panel's horizontal axis accumulated as angles and clamped to 0..90°, never roll, never scale.
+- Resize: four corner handles (Meta `PanelWithManipulators` pattern), each with `GrabInteractable` (direct grip) and `RayInteractable` (trigger; hover surface = the handle sphere, select surface = `Handles/Scale Plane`, an infinite plane in the panel plane), pointing at the `Scaler` `Grabbable` with `UniformGrabScaleTransformer`: absolute scale = start scale × in-plane distance from the centre now / at grab start, clamped 0.5-2.5×. Handles keep a constant world size (`LateUpdate`).
+- Why not distance grab: the rig's `BestHoverInteractorGroup` ranks `ControllerDistanceGrabInteractor` above `ControllerRayInteractor`, and `DistantCandidateComputer` keeps a sticky `_stableCandidate` without re-checking interactor filters, so a distance-grabbable frame next to the toolbar kept the ray disabled. Two-hand scaling with distance grab (Stage 5) also saturated: both `MoveAtSourceProvider` grab points start at the object origin and `GrabFreeTransformer` multiplies per-frame distance ratios, so the first ratio was huge and the scale stuck at the maximum.
+- All panel colliders are triggers, so the CharacterController, the recovery guard and `CapsuleClearance` ignore them. The grab interaction, toolbar and handles are active only while the panel is open (`_activeWhileOpen`).
 
 ### Tools and pointer
 - `HMI/Tools` = `TacticalToolController`; `HMI/Pointer` = `HmiPointer`.
-- Pointer: right ISDK `ControllerRayInteractor` origin and forward, right trigger (hysteresis 0.55 / 0.35). It yields while the ISDK ray hovers UI and is off while flying.
-- Hit resolution: table surface → map point; SimWorld collider with up normal and height < 0.15 m → floor point; anything else → blocked (red).
-- Goal: click on a free cell (table or floor).
+- Pointer: right controller ray read from the `ControllerRayInteractor`'s ray-origin transform (`_rayOrigin`, wired in the scene; `RayInteractor.Origin` goes stale while its interactor group keeps it disabled), right trigger (hysteresis 0.55 / 0.35). It yields while the ISDK ray hovers UI or the panel frame/handles and is off while flying.
+- Hit resolution: panel surface (`PanelSurface`) → map point; SimWorld collider with up normal and height < 0.15 m → floor point; anything else → blocked (red).
+- Goal: click on a free cell (panel or floor).
 - Path: hold and drag; samples ≥ 5 cm apart; sent if length ≥ 0.3 m.
 - No-go brush: radius 0.15 / 0.30 / 0.50 m; samples every radius/2.
 - While a stroke is held, `LocomotionInputGate` is held.
@@ -152,7 +156,7 @@ Meta XR Operator MCP at `http://127.0.0.1:8720/mcp` while in Play mode: `openxr_
 - `HMI/World Overlay` (`WorldOverlay`): `/plan`, goal ring, active path and keepout mask drawn on the house floor (y 0.02-0.03).
 
 ### VR menu tabs
-- Mission (`VrMissionPage`): open/close table, tool and brush, Pause / Resume / Cancel enabled by mission state, mission and ROS/bridge status, disabled Stage 6 teleop button.
+- Mission (`VrMissionPage` + `ToolSelector`): open/close panel, tool and brush for the real floor (mirrors the panel toolbar; "Clear no-go zones" in its own row below the brush), Pause / Resume / Cancel enabled by mission state, mission and ROS/bridge status, disabled Stage 6 teleop button.
 - Map (`VrMapPage`): saved maps list with Load; Save as new `map_YYYYMMDD_HHMM`; Overwrite current; Reset map and Clear no-go zones, each with a two-step confirm. Buttons are disabled while BUSY or disconnected.
 - Settings: as described in the VR menu section above.
 
@@ -163,7 +167,7 @@ Meta XR Operator MCP at `http://127.0.0.1:8720/mcp` while in Play mode: `openxr_
   - button state colors through Animator controllers chosen by tag (Primary / Secondary / Destructive / ToggleButton / ToggleSwitch);
   - **every TMP text gets the theme font** (LiberationSans in the package theme) and the primary or secondary (`QDSUITextSecondaryColor`) color. `QDSUISharedThemeColor` objects are left alone (status chips).
 - `UiTextRole` (`Scripts/XR`, runs after the manager) re-applies the project fonts and sizes from `Assets/_Project/UI/UiTextStyles.asset`: Title (Roboto Bold 26), Heading (Bold 18), Body (Regular 18), Caption (Regular 15), Label (Medium 18, button labels). Change sizes there; every text in both menus has a role.
-- Components (nested instances of the UI Set prefabs): Primary (Open table, Load scene, OK), Destructive (Cancel, Reset map, Clear no-go zones), Secondary (everything else), `TextTileButton_IconAndLabel_Toggle` for tabs, tools and brush (visual on state = selected), `ToggleButton_Switch` for fly mode. Icons come from `Runtime/Sample/Textures/OCUIIconSet`. Rounded corners: material `RoundedBoxUI` + `RoundedBoxUIProperties`.
+- Components (nested instances of the UI Set prefabs): Primary (Open panel, Load scene, OK), Destructive (Cancel, Reset map, Clear no-go zones), Secondary (everything else), `TextTileButton_IconAndLabel_Toggle` for tabs, tools and brush (visual on state = selected), `ToggleButton_Switch` for fly mode. Icons come from `Runtime/Sample/Textures/OCUIIconSet`. Rounded corners: material `RoundedBoxUI` + `RoundedBoxUIProperties`.
 - Selection uses `Toggle.isOn` (tabs, tools, brush), not `interactable = false`; `interactable` only means "unavailable". No `ToggleGroup`: the page scripts keep exactly one toggle on. Code sets toggles through `UiToggles.Set` (with notification, under a guard flag), because the UI Set highlight (`AnimatorOverrideLayerWeight`) ignores `SetIsOnWithoutNotify`; a click on the active item is undone in `LateUpdate`.
 - `StatusChip` (`Scripts/XR`): rounded colored chip for the ROS, mission and map states (Ok green, Warn amber, Error red, Neutral gray).
 - Layout: canvas scale 0.001 (UI Set units), pages are `VerticalLayoutGroup`s of sections; the panel height fits the tallest page (VrMenu 520×749, StartMenu 560×306).

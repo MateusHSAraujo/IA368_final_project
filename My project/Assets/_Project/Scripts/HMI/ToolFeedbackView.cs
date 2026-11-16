@@ -7,7 +7,7 @@ namespace VRRobot.HMI
 {
     /// <summary>
     /// Procedural line renderers that show the tool feedback (plan, goal ring, active path, stroke preview, pending
-    /// strokes) in a given space: the table (miniature) or the world. Shared by the table and the world overlay.
+    /// strokes) in a given space: the operations panel (miniature) or the world. Shared by the panel and the world overlay.
     /// </summary>
     internal sealed class ToolFeedbackView
     {
@@ -23,7 +23,7 @@ namespace VRRobot.HMI
         readonly List<Vector3> _tmp = new List<Vector3>();
 
         /// <param name="toLocal">(mapXY, localHeight) to the local position inside <paramref name="parent"/>.</param>
-        /// <param name="scale">Local units per world meter (k for the table, 1 for the world).</param>
+        /// <param name="scale">Local units per world meter (k for the panel, 1 for the world).</param>
         /// <param name="goalRadius">Goal ring radius in world meters.</param>
         public ToolFeedbackView(Transform parent, Func<Vector2, float, Vector3> toLocal, Func<float> scale,
             float lineWidth, float height, float goalRadius, Material plan, Material goal, Material preview,

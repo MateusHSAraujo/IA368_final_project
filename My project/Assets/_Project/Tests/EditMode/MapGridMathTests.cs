@@ -27,13 +27,13 @@ namespace VRRobot.Tests
         }
 
         [Test]
-        public void TableLocalRoundTrip()
+        public void PanelLocalRoundTrip()
         {
             var center = new Vector3(1f, 0f, -2f);
             var world = new Vector3(3f, 0.5f, 0f);
-            var local = MapGridMath.WorldToTableLocal(world, center, 0.1f);
+            var local = MapGridMath.WorldToPanelLocal(world, center, 0.1f);
             Assert.That(Vector3.Distance(local, new Vector3(0.2f, 0.05f, 0.2f)), Is.LessThan(1e-5f));
-            Assert.That(Vector3.Distance(MapGridMath.TableLocalToWorld(local, center, 0.1f), world), Is.LessThan(1e-4f));
+            Assert.That(Vector3.Distance(MapGridMath.PanelLocalToWorld(local, center, 0.1f), world), Is.LessThan(1e-4f));
         }
 
         [Test]

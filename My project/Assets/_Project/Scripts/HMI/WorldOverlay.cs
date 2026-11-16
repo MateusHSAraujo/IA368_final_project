@@ -7,7 +7,7 @@ namespace VRRobot.HMI
 {
     /// <summary>
     /// The tool feedback drawn in the real 3D world (map frame == world): plan, goal ring, active path, keepout
-    /// overlay and stroke previews. Always visible, independent of the tactical table.
+    /// overlay and stroke previews. Always visible, independent of the operations panel.
     /// </summary>
     public class WorldOverlay : MonoBehaviour
     {

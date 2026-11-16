@@ -8,8 +8,15 @@ Usage:
   python -u aim_tools.py click <spec>                    # aim + trigger press/release
   python -u aim_tools.py stroke <spec1> <spec2> ...      # aim at first, hold trigger, sweep through the rest
   python -u aim_tools.py state                           # print the helper state
-  python -u aim_tools.py grab <spec> <dx> <dz> <yaw_deg> # distance grab (right grip): aim, hold Grip, move
-                                                         #   dx/dz metres (OpenXR local_floor) and yaw, release
+  python -u aim_tools.py grab <spec> <dx> <dz> <yaw_deg> [pitch_deg]
+                                                         # distance grab (right grip): aim, hold Grip, move
+                                                         #   dx/dz metres (OpenXR local_floor), yaw and pitch
+                                                         #   (Unity sense: + tilts the top away), release
+  python -u aim_tools.py drag <spec> <dx> <dz> <yaw_deg> [pitch_deg] [dy]
+                                                         # ray grab (right Trigger): like grab, plus dy metres;
+                                                         #   operations panel frame bars and resize handles
+  python -u aim_tools.py sweep <spec_from> <spec_to>     # ray grab (Trigger) at spec_from, re-aim the ray at
+                                                         #   spec_to while holding (e.g. drag a resize handle)
   python -u aim_tools.py scale <spread_m> [spec]         # both grips held, hands spread along OpenXR X;
                                                          #   the LEFT hand must already hover the target
                                                          #   (optional spec aims the right hand first)
@@ -17,9 +24,10 @@ Usage:
 
 Spec syntax:
   button:<exact GameObject name>   active UI Button
-  map:x;y                          ROS map point on the tactical table
+  map:x;y                          ROS map point on the operations panel
   floor:x;y                        ROS map point on the real floor
-  bar:offset;up                    nearest table frame bar + offset along the table right axis (+ up, m)
+  handle:i                         panel corner resize handle (0 NL, 1 NR, 2 FL, 3 FR)
+  bar:offset;up                    nearest panel frame bar + offset along the panel right axis (+ up, m)
   world:x;y;z                      Unity world point
 """
 import json
@@ -77,22 +85,35 @@ def grip(hand, v):
     xr.call("openxr_set_controller_input", {"hand": hand, "component": "Grip", "value": v})
 
 
-def cmd_grab(spec, dx, dz, yaw_deg):
+def cmd_grab(spec, dx, dz, yaw_deg, pitch_deg=0.0, button="Grip", dy=0.0):
     aim(spec)
-    grip("right", 1)
+    xr.call("openxr_set_controller_input", {"hand": "right", "component": button, "value": 1})
     time.sleep(0.6)
     pose = xr.get_grip_pose("right")
     steps = 8
     for i in range(1, steps + 1):
         f = i / steps
-        pos = [pose["position"][0] + dx * f, pose["position"][1], pose["position"][2] + dz * f]
+        pos = [pose["position"][0] + dx * f, pose["position"][1] + dy * f, pose["position"][2] + dz * f]
         a = math.radians(yaw_deg * f) / 2  # yaw about OpenXR +Y
-        xr.set_grip_pose("right", pos, xr.qmul([0, math.sin(a), 0, math.cos(a)], pose["orientation"]))
+        b = -math.radians(pitch_deg * f) / 2  # Unity +X rotation = OpenXR -X rotation (handedness flip)
+        q = xr.qmul([0, math.sin(a), 0, math.cos(a)], [math.sin(b), 0, 0, math.cos(b)])
+        xr.set_grip_pose("right", pos, xr.qmul(q, pose["orientation"]))
         time.sleep(0.15)
     time.sleep(0.4)
-    grip("right", 0)
+    xr.call("openxr_set_controller_input", {"hand": "right", "component": button, "value": 0})
     time.sleep(0.5)
     print("after grab:", read_state(time.time() - 0.2)["pointer"])
+
+
+def cmd_sweep(spec_from, spec_to):
+    aim(spec_from)
+    trigger(1)
+    time.sleep(0.4)
+    aim(spec_to, tol=0.3, max_iter=6)
+    time.sleep(0.3)
+    trigger(0)
+    time.sleep(0.5)
+    print("after sweep:", read_state(time.time() - 0.2)["pointer"])
 
 
 def cmd_scale(spread, spec=None):
@@ -143,7 +164,12 @@ def main():
         time.sleep(0.5)
         print("after stroke:", read_state(time.time() - 0.2)["pointer"])
     elif cmd == "grab":
-        cmd_grab(a[0], float(a[1]), float(a[2]), float(a[3]))
+        cmd_grab(a[0], float(a[1]), float(a[2]), float(a[3]), float(a[4]) if len(a) > 4 else 0.0)
+    elif cmd == "drag":
+        cmd_grab(a[0], float(a[1]), float(a[2]), float(a[3]), float(a[4]) if len(a) > 4 else 0.0, "Trigger",
+                 float(a[5]) if len(a) > 5 else 0.0)
+    elif cmd == "sweep":
+        cmd_sweep(a[0], a[1])
     elif cmd == "scale":
         cmd_scale(float(a[0]) if a else 0.15, a[1] if len(a) > 1 else None)
     elif cmd == "menu":

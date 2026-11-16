@@ -7,17 +7,21 @@ using VRRobot.XR;
 
 namespace VRRobot.HMI
 {
-    public enum HitKind { None, Table, Floor, Blocked }
+    public enum HitKind { None, Panel, Floor, Blocked }
 
     /// <summary>
     /// Tool pointer on the right controller: casts the ray of the ISDK ray interactor against the physics scene and
-    /// resolves it to a point on the tactical table or on the real floor, in map coordinates. Yields to the ISDK
-    /// whenever the ray is hovering something it handles (menu canvas, table frame grab).
+    /// resolves it to a point on the operations panel or on the real floor, in map coordinates. Yields to the ISDK
+    /// whenever the ray is hovering something it handles (menu canvas, panel frame grab).
     /// </summary>
     [DefaultExecutionOrder(-10)]
     public class HmiPointer : MonoBehaviour
     {
         [SerializeField, Tooltip("Right controller RayInteractor (Oculus.Interaction.RayInteractor).")] RayInteractor _rayInteractor;
+        [SerializeField, Tooltip("The RayInteractor's ray origin transform. Read directly: while a higher-priority " +
+                                 "interactor of the same group hovers (e.g. a distance grab), the " +
+                                 "RayInteractor is Disabled and its Origin/Forward stop updating.")]
+        Transform _rayOrigin;
         [SerializeField, Tooltip("Camera Rig root: colliders under it are skipped.")] Transform _ignoreRoot;
         [SerializeField] VrFlyMode _flyMode;
         [SerializeField] float _maxDistance = 15f;
@@ -29,10 +33,18 @@ namespace VRRobot.HMI
         [SerializeField] Transform _reticle;
         [SerializeField] Color _validColor = new Color(0.4f, 1f, 1f, 0.9f);
         [SerializeField] Color _invalidColor = new Color(1f, 0.2f, 0.2f, 0.9f);
-        [SerializeField] float _reticleSizeTable = 0.015f;
+        [SerializeField, UnityEngine.Serialization.FormerlySerializedAs("_reticleSizeTable")] float _reticleSizePanel = 0.015f;
         [SerializeField] float _reticleSizeFloor = 0.12f;
 
         static readonly int BaseColor = Shader.PropertyToID("_BaseColor");
+
+        public RayInteractor RayInteractor => _rayInteractor;
+
+        /// <summary>Current controller ray, valid even while the RayInteractor is disabled by its group.</summary>
+        public Ray CurrentRay => _rayOrigin != null
+            ? new Ray(_rayOrigin.position, _rayOrigin.forward)
+            : new Ray(_rayInteractor != null ? _rayInteractor.Origin : Vector3.zero,
+                      _rayInteractor != null ? _rayInteractor.Forward : Vector3.forward);
 
         /// <summary>Set by the tool controller: the pointer does nothing while false.</summary>
         public bool Active { get; set; }
@@ -106,12 +118,13 @@ namespace VRRobot.HMI
             if (falling) _held = false;
             TriggerHeld = _held;
 
-            var origin = _rayInteractor.Origin;
-            var dir = _rayInteractor.Forward;
+            var ray = CurrentRay;
+            var origin = ray.origin;
+            var dir = ray.direction;
             if (uiHover || dir.sqrMagnitude < 0.5f) { Hide(); return; }
 
-            // The tactical table's colliders are triggers (see HolographicTacticalTable), so triggers are collected
-            // and every trigger that does not belong to a table is skipped below.
+            // The operations panel's colliders are triggers (see OperationsPanel), so triggers are collected
+            // and every trigger that does not belong to the panel is skipped below.
             int n = Physics.RaycastNonAlloc(origin, dir, _hits, _maxDistance, ~0, QueryTriggerInteraction.Collide);
             Array.Sort(_hits, 0, n, HitComparer.Instance);
 
@@ -123,7 +136,7 @@ namespace VRRobot.HMI
                 var tr = hit.collider.transform;
                 if (_ignoreRoot != null && tr.IsChildOf(_ignoreRoot)) continue;
                 if (tr.IsChildOf(transform)) continue;
-                if (hit.collider.isTrigger && hit.collider.GetComponentInParent<HolographicTacticalTable>() == null) continue;
+                if (hit.collider.isTrigger && hit.collider.GetComponentInParent<OperationsPanel>() == null) continue;
                 Resolve(hit);
                 end = hit.point;
                 normal = hit.normal;
@@ -143,7 +156,7 @@ namespace VRRobot.HMI
                 _reticle.gameObject.SetActive(show);
                 if (show)
                 {
-                    float s = Kind == HitKind.Table ? _reticleSizeTable : _reticleSizeFloor;
+                    float s = Kind == HitKind.Panel ? _reticleSizePanel : _reticleSizeFloor;
                     _reticle.position = end + normal * 0.002f;
                     _reticle.rotation = Quaternion.FromToRotation(Vector3.up, normal);
                     _reticle.localScale = new Vector3(s, s * 0.1f, s);
@@ -154,12 +167,12 @@ namespace VRRobot.HMI
 
         void Resolve(RaycastHit hit)
         {
-            var surface = hit.collider.GetComponentInParent<TableSurface>();
-            if (surface != null && surface.Table != null)
+            var surface = hit.collider.GetComponentInParent<PanelSurface>();
+            if (surface != null && surface.Panel != null)
             {
-                if (surface.Table.TryLocalToMap(hit.point, out var mp))
+                if (surface.Panel.TryLocalToMap(hit.point, out var mp))
                 {
-                    Kind = HitKind.Table;
+                    Kind = HitKind.Panel;
                     HasPoint = true;
                     MapPoint = mp;
                     HitWorld = hit.point;

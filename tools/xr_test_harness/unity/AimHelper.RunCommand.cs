@@ -48,19 +48,28 @@ internal class CommandScript : IRunCommand
                 return null;
             case "map":
             {
-                var t = Object.FindFirstObjectByType<VRRobot.HMI.HolographicTacticalTable>();
-                if (t == null || !t.IsOpen) return null;  // table closed: not found
-                return t.MapToTableWorld(new Vector2(F(p[0]), F(p[1])), 0f);
+                var t = Object.FindFirstObjectByType<VRRobot.HMI.OperationsPanel>();
+                if (t == null || !t.IsOpen) return null;  // panel closed: not found
+                return t.MapToPanelWorld(new Vector2(F(p[0]), F(p[1])), 0f);
             }
             case "floor":
                 return VRRobot.Core.MapGridMath.MapToWorld(new Vector2(F(p[0]), F(p[1])), 0f);
             case "world":
                 return new Vector3(F(p[0]), F(p[1]), F(p[2]));
+            case "handle":
+            {
+                // Corner resize handle: 0 near-left, 1 near-right, 2 far-left, 3 far-right.
+                var panel = Object.FindFirstObjectByType<VRRobot.HMI.OperationsPanel>();
+                var hs = panel != null ? panel.transform.Find("Pivot/Handles") : null;
+                int idx = int.Parse(p[0], Inv);
+                if (hs == null || !hs.gameObject.activeInHierarchy || idx >= hs.childCount) return null;
+                return hs.GetChild(idx).position;
+            }
             case "bar":
             {
-                var table = Object.FindFirstObjectByType<VRRobot.HMI.HolographicTacticalTable>();
-                if (table == null || _eye == null) return null;
-                var frame = table.transform.Find("Content/Frame");
+                var panel = Object.FindFirstObjectByType<VRRobot.HMI.OperationsPanel>();
+                if (panel == null || _eye == null) return null;
+                var frame = panel.transform.Find("Pivot/Content/Frame");
                 if (frame == null) return null;
                 Transform best = null; float bd = float.MaxValue;
                 foreach (Transform c in frame)
@@ -69,7 +78,7 @@ internal class CommandScript : IRunCommand
                     if (d < bd) { bd = d; best = c; }
                 }
                 if (best == null) return null;
-                return best.position + table.transform.right * F(p[0]) + Vector3.up * F(p[1]);
+                return best.position + panel.transform.right * F(p[0]) + Vector3.up * F(p[1]);
             }
         }
         return null;
@@ -77,16 +86,17 @@ internal class CommandScript : IRunCommand
 
     static string Pointer()
     {
-        var table = Object.FindFirstObjectByType<VRRobot.HMI.HolographicTacticalTable>();
+        var panel = Object.FindFirstObjectByType<VRRobot.HMI.OperationsPanel>();
         var ptr = Object.FindFirstObjectByType<VRRobot.HMI.HmiPointer>();
         string s = ptr != null
             ? ptr.Kind + " valid=" + ptr.Valid + " map=" + ptr.MapPoint + " trigger=" + ptr.TriggerHeld
             : "no HmiPointer";
-        s += " table=" + (table != null && table.IsOpen ? "open" : "closed");
-        if (table != null)
+        s += " panel=" + (panel != null && panel.IsOpen ? "open" : "closed");
+        if (panel != null)
         {
-            var t = table.transform;
+            var t = panel.transform;
             s += " tpos=" + t.position.ToString("F2") + " tyaw=" + t.eulerAngles.y.ToString("F1", Inv)
+                 + " tpitch=" + t.eulerAngles.x.ToString("F1", Inv) + " troll=" + t.eulerAngles.z.ToString("F1", Inv)
                  + " tscale=" + t.lossyScale.x.ToString("F2", Inv);
         }
         var rig = GameObject.Find("[BuildingBlock] Camera Rig");

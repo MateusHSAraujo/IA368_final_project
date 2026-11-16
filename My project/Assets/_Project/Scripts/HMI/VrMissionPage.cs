@@ -2,32 +2,24 @@ using System.Globalization;
 using TMPro;
 using VRRobot.XR;
 using UnityEngine;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
 
 namespace VRRobot.HMI
 {
     /// <summary>
-    /// Mission page of the VR menu (the Spatial Menu of the project plan): opens/closes the Holographic Tactical Table,
-    /// selects the pointing tool and the no-go brush, controls the active mission (pause / resume / cancel) and shows
-    /// the ROS, bridge and mission status. Tolerates a missing <see cref="RosHmiClient"/>.
+    /// Mission page of the VR menu (the Spatial Menu of the project plan): opens/closes the operations panel,
+    /// controls the active mission (pause / resume / cancel) and shows the ROS, bridge and mission status. The tool
+    /// picker on this page is a <see cref="ToolSelector"/>. Tolerates a missing <see cref="RosHmiClient"/>.
     /// </summary>
     public class VrMissionPage : MonoBehaviour
     {
         [Header("Scene references (fall back to FindFirstObjectByType)")]
-        [SerializeField] HolographicTacticalTable _table;
-        [SerializeField] TacticalToolController _tools;
+        [SerializeField, FormerlySerializedAs("_table")] OperationsPanel _panel;
 
-        [Header("Table")]
-        [SerializeField] Button _tableButton;
-        [SerializeField] TMP_Text _tableLabel;
-
-        [Header("Tools (None, Goal, Path, No-go)")]
-        [SerializeField] Toggle[] _toolButtons;
-
-        [Header("Brush (S, M, L)")]
-        [SerializeField, Tooltip("Row that is visible only with the No-go tool.")] GameObject _brushRow;
-        [SerializeField] Toggle[] _brushButtons;
-        [SerializeField] TMP_Text[] _brushLabels;
+        [Header("Operations panel")]
+        [SerializeField, FormerlySerializedAs("_tableButton")] Button _panelButton;
+        [SerializeField, FormerlySerializedAs("_tableLabel")] TMP_Text _panelLabel;
 
         [Header("Mission control")]
         [SerializeField] Button _pauseButton;
@@ -45,35 +37,12 @@ namespace VRRobot.HMI
         static readonly Color Bad = new Color(1f, 0.45f, 0.4f);
 
         RosHmiClient _ros;
-        bool _syncing;      // true while code sets toggles (see UiToggles)
-        bool _resyncTools;  // a toggle changed by the user; re-apply the tool/brush state after the event
 
         void Awake()
         {
-            if (_table == null) _table = FindFirstObjectByType<HolographicTacticalTable>(FindObjectsInactive.Include);
-            if (_tools == null) _tools = FindFirstObjectByType<TacticalToolController>(FindObjectsInactive.Include);
+            if (_panel == null) _panel = FindFirstObjectByType<OperationsPanel>(FindObjectsInactive.Include);
 
-            if (_tableButton != null) _tableButton.onClick.AddListener(() => { if (_table != null) _table.Toggle(); });
-            for (int i = 0; i < _toolButtons.Length; i++)
-            {
-                var tool = (TacticalTool)i;
-                if (_toolButtons[i] != null) _toolButtons[i].onValueChanged.AddListener(on =>
-                {
-                    if (_syncing) return;
-                    if (on && _tools != null) _tools.SetTool(tool);
-                    _resyncTools = true; // turning the active tool off is undone in LateUpdate
-                });
-            }
-            for (int i = 0; i < _brushButtons.Length; i++)
-            {
-                int index = i;
-                if (_brushButtons[i] != null) _brushButtons[i].onValueChanged.AddListener(on =>
-                {
-                    if (_syncing) return;
-                    if (on && _tools != null) _tools.SetBrush(index);
-                    _resyncTools = true;
-                });
-            }
+            if (_panelButton != null) _panelButton.onClick.AddListener(() => { if (_panel != null) _panel.Toggle(); });
             if (_pauseButton != null) _pauseButton.onClick.AddListener(() => Send("PAUSE"));
             if (_resumeButton != null) _resumeButton.onClick.AddListener(() => Send("RESUME"));
             if (_cancelButton != null) _cancelButton.onClick.AddListener(() => Send("CANCEL"));
@@ -82,12 +51,7 @@ namespace VRRobot.HMI
         void OnEnable()
         {
             _ros = RosHmiClient.Instance;
-            if (_table != null) _table.OpenChanged += OnTableChanged;
-            if (_tools != null)
-            {
-                _tools.ToolChanged += OnToolChanged;
-                _tools.BrushChanged += RefreshTools;
-            }
+            if (_panel != null) _panel.OpenChanged += OnPanelChanged;
             if (_ros != null)
             {
                 _ros.ConnectionChanged += OnConnectionChanged;
@@ -99,12 +63,7 @@ namespace VRRobot.HMI
 
         void OnDisable()
         {
-            if (_table != null) _table.OpenChanged -= OnTableChanged;
-            if (_tools != null)
-            {
-                _tools.ToolChanged -= OnToolChanged;
-                _tools.BrushChanged -= RefreshTools;
-            }
+            if (_panel != null) _panel.OpenChanged -= OnPanelChanged;
             if (_ros != null)
             {
                 _ros.ConnectionChanged -= OnConnectionChanged;
@@ -114,64 +73,27 @@ namespace VRRobot.HMI
             _ros = null;
         }
 
-        // Re-applied outside the toggle callbacks: setting a toggle inside its own onValueChanged would reach the
-        // UI Set's highlight listener in the wrong order.
-        void LateUpdate()
-        {
-            if (!_resyncTools) return;
-            _resyncTools = false;
-            RefreshTools();
-        }
-
         void Send(string cmd)
         {
             if (_ros != null) _ros.SendMissionCmd(cmd);
         }
 
-        void OnTableChanged(bool open) => RefreshTable();
-        void OnToolChanged(TacticalTool tool) => RefreshTools();
+        void OnPanelChanged(bool open) => RefreshPanel();
         void OnConnectionChanged(bool connected) => RefreshStatus();
         void OnBridgeChanged(string status) => RefreshStatus();
         void OnMissionChanged(MissionState state) => RefreshStatus();
 
         void RefreshAll()
         {
-            RefreshTable();
-            RefreshTools();
+            RefreshPanel();
             RefreshStatus();
         }
 
-        void RefreshTable()
+        void RefreshPanel()
         {
-            bool open = _table != null && _table.IsOpen;
-            if (_tableLabel != null) _tableLabel.text = open ? "Close table" : "Open table";
-            if (_tableButton != null) _tableButton.interactable = _table != null;
-        }
-
-        void RefreshTools()
-        {
-            var current = _tools != null ? _tools.Tool : TacticalTool.None;
-            for (int i = 0; i < _toolButtons.Length; i++)
-            {
-                if (_toolButtons[i] == null) continue;
-                _toolButtons[i].interactable = _tools != null;
-                UiToggles.Set(_toolButtons[i], i == (int)current, ref _syncing);
-            }
-
-            if (_brushRow != null) _brushRow.SetActive(_tools != null && current == TacticalTool.NoGo);
-            if (_tools == null) return;
-            for (int i = 0; i < _brushButtons.Length; i++)
-            {
-                if (_brushButtons[i] == null) continue;
-                bool exists = i < _tools.BrushCount;
-                _brushButtons[i].gameObject.SetActive(exists);
-                UiToggles.Set(_brushButtons[i], i == _tools.BrushIndex, ref _syncing);
-                if (exists && i < _brushLabels.Length && _brushLabels[i] != null)
-                {
-                    float r = _tools.BrushRadiusAt(i);
-                    _brushLabels[i].text = r.ToString("0.00", CultureInfo.InvariantCulture) + " m";
-                }
-            }
+            bool open = _panel != null && _panel.IsOpen;
+            if (_panelLabel != null) _panelLabel.text = open ? "Close panel" : "Open panel";
+            if (_panelButton != null) _panelButton.interactable = _panel != null;
         }
 
         static StatusChip.Level MissionLevel(string state)
