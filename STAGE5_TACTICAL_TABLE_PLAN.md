@@ -54,7 +54,7 @@ References: VRRobot.Core, VRRobot.SimWorld, VRRobot.XR, Oculus.Interaction, Ocul
 
 Menu tabs become **Mission · Map · Settings**. UI is built through MCP in the existing prefab style (uGUI + TMP, ray canvas already set up).
 
-### WSL change (not committed by me)
+### WSL change (committed by the WSL agent in `3e1e3b8`)
 `mission_supervisor_node.py`: add a volatile `/hmi/keepout_mask` publisher (`nav_msgs/OccupancyGrid`, same content as the mask), published on every mask change and every 2 s. Add a pytest case in `tests/test_mission_supervisor.py` and a row in the README "HMI topics" table. Then `colcon build` and run the offline suite (197 + new tests).
 
 ## Steps (each ends with a check; delegation in brackets)
@@ -85,7 +85,7 @@ Menu tabs become **Mission · Map · Settings**. UI is built through MCP in the 
 
 ## Execution status
 - [x] Step 0: plan document created (2026-11-15).
-- [x] Step 1: WSL `/hmi/keepout_mask` (volatile copy, on change + every 2 s, parameter `keepout_republish_period`; README row; new test; offline suite 209 passed). Not committed in the WSL repo.
+- [x] Step 1: WSL `/hmi/keepout_mask` (volatile copy, on change + every 2 s, parameter `keepout_republish_period`; README row; new test; offline suite 209 passed). Committed in the WSL repo as `3e1e3b8` (together with `/hmi/map`, step 8).
 - [x] Step 2: `MapGridMath`, `HmiJson` + tests (EditMode 41/41). The HMI asmdef also needs `Unity.Robotics.ROSTCPConnector.MessageGeneration` (base `Message` type).
 - [x] Step 3: `RosHmiClient`, `OccupancyGridTexture`; `ROS Connection` (HUD off, TF listening off) + `HMI` objects in `VrScene`. Live check: `/map` 281x180 res 0.05 origin (-1.52, -3.58), `/hmi/keepout_mask` 310x210, mission IDLE, map state READY `scene_house`.
 - [x] Step 4: `TacticalTable.prefab` (visuals built at runtime under `Content`; `GridQuadMesh`, `TableSurface`, `ToolFeedbackView`; materials in `Materials/HMI/`). Grab: `QuickActionsAPI.AddDistanceGrabInteraction(ManipulateInPlace)` on the root (controller grip, `MoveAtSourceProvider`), kinematic `Rigidbody`, `GrabFreeTransformer` as one- and two-grab transformer (pitch/roll locked, uniform scale 0.5-3x); the `Surface` has its own kinematic Rigidbody so only the frame bars grab. Deviation: the ISDK controller ray selects with the trigger, so the frame is grabbed with the distance grab (grip) instead of a ray grab. Open(): near edge 0.3 m ahead; content turned 90 degrees when the map is deeper than wide (long side across the view).
@@ -102,7 +102,7 @@ Menu tabs become **Mission · Map · Settings**. UI is built through MCP in the 
   - Grab: frame grip-grab moved and yawed the table (25 deg); two-hand grab scaled it (clamped at 3x). Found and fixed: `DistanceGrabInteractable` cached 0 colliders (bars were inactive at Start); a scaled table enclosing the player triggered the recovery guard -> table colliders are now triggers.
   - ROS stack stopped -> "ROS: disconnected", no exceptions; restarted -> reconnected automatically and the map/state came back. The bridge status now shows "unknown" while disconnected.
   - Observation (not HMI): after the robot moved, the Stage 4 spawn picked (-0.37, -0.10, -0.42) instead of (-0.37, 0.03, 0.33) (NavMesh islands changed 5 -> 4), leaving the view against a wall; to be looked at separately.
-- [x] Step 9: review (sonnet review of `Scripts/HMI` + `MapGridMath`; fixed: no send/active marker while ROS is disconnected, stale mission mode clearing the new goal/path, raycast buffer 128 -> 512, invalid grid data ignored, stale `/plan` cleared on mission change, empty map-list rows guard, pending strokes cleared with "Clear no-go zones", `WorldOverlay` forced to the world origin; not changed: client re-resolution if `RosHmiClient` were replaced at runtime). EditMode 41/41 after the fixes; smoke test (table goal -> NAVIGATING) passed. Docs: `README_UNITY.md` (HMI section), `CLAUDE.md` (status, interface, HMI lessons). Desktop scene not re-run (it uses nothing that changed). Committed in `ba557bc`; the WSL changes (`/hmi/map`, `/hmi/keepout_mask`, tests, README) are uncommitted in the WSL repo.
+- [x] Step 9: review (sonnet review of `Scripts/HMI` + `MapGridMath`; fixed: no send/active marker while ROS is disconnected, stale mission mode clearing the new goal/path, raycast buffer 128 -> 512, invalid grid data ignored, stale `/plan` cleared on mission change, empty map-list rows guard, pending strokes cleared with "Clear no-go zones", `WorldOverlay` forced to the world origin; not changed: client re-resolution if `RosHmiClient` were replaced at runtime). EditMode 41/41 after the fixes; smoke test (table goal -> NAVIGATING) passed. Docs: `README_UNITY.md` (HMI section), `CLAUDE.md` (status, interface, HMI lessons). Desktop scene not re-run (it uses nothing that changed). Committed in `ba557bc`; the WSL changes (`/hmi/map`, `/hmi/keepout_mask`, tests, README) were committed in the WSL repo as `3e1e3b8` (offline suite 211 passed).
 
 ## Follow-up: operations panel (usability review, 2026-11-15)
 

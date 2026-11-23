@@ -5,16 +5,18 @@ Reference documents:
 - `IMPLEMENTATION_PLAN.md`: revised stage-by-stage plan. Section 2.4 lists the open architecture items for Stages 3–6.
 - `STAGE1_UNITY_PLAN.md`: detailed plan of Stage 1 (CoppeliaSim → Unity converter, no VR), with its execution status. Done.
 - `STAGE4_VR_LOCOMOTION_PLAN.md`: detailed plan of Stage 4 part 1 (VR scene + locomotion, menus, start flow), with its execution status. Done and committed.
+- `STAGE5_TACTICAL_TABLE_PLAN.md`: Stage 4 Spatial Menu + Stage 5 Unity side (operations panel, HMI tools), with its execution status and the operations panel follow-up. Done and committed.
 - Each new Windows-side task gets its own `STAGE<n>_<TOPIC>_PLAN.md` with an execution status section; it is the source of truth for that task, kept updated (status, deviations) as the work progresses.
 
-## Current status (2026-11-15)
+## Current status (2026-11-23)
 - **Stage 1 done** (desktop converter, `SimWorld_Desktop.unity`).
 - **Stages 2 and 3 done** (WSL repo, 2026-11-13, validated live against `scene_house.ttt`): network scripts, `coppelia_bridge_node` (scan, odom, TF, compressed camera, `cmd_vel`), slam_toolbox, Nav2 with the Keepout Filter, ROS-TCP-Endpoint v0.7.0 on port 10000.
 - **Stage 4, part 1 done and committed** (`27425d3`, `STAGE4_VR_LOCOMOTION_PLAN.md`): VR scene with locomotion (walk, snap turn, teleport on a runtime NavMesh, recovery guard), VR menu with a Settings page (fly mode, height), start flow (main menu → overview while building → spawn), procedural sky. Validated in the Meta XR Simulator.
 - **Stage 5 ROS side done** (WSL repo, 2026-11-14): `mission_supervisor_node` (missions, pause/resume, keepout strokes, saved maps; reference map `scene_house`).
-- **Stage 4 VR Spatial Menu + Stage 5 Unity side done** (`STAGE5_TACTICAL_TABLE_PLAN.md`, 2026-11-15, validated end to end in the Meta XR Simulator against the live stack): module `Scripts/HMI/` (`RosHmiClient`, operations panel (formerly the holographic tactical table), goal / path / no-go tools on the panel and on the real floor, world overlay, Mission and Map menu pages). The WSL side gained `/hmi/map` and `/hmi/keepout_mask` (volatile copies, not committed there by this agent).
+- **Stage 4 VR Spatial Menu + Stage 5 Unity side done** (`STAGE5_TACTICAL_TABLE_PLAN.md`, 2026-11-15, validated end to end in the Meta XR Simulator against the live stack): module `Scripts/HMI/` (`RosHmiClient`, operations panel (formerly the holographic tactical table), goal / path / no-go tools on the panel and on the real floor, world overlay, Mission and Map menu pages). The WSL side gained `/hmi/map` and `/hmi/keepout_mask` (volatile copies; committed in the WSL repo as `3e1e3b8`).
 - **Operations panel follow-up done** (2026-11-15, section "Follow-up" of `STAGE5_TACTICAL_TABLE_PLAN.md`): the table became `OperationsPanel` — opens upright with Y (left controller), fits the map in view, trigger ray grab on the frame to move / yaw / pitch down to horizontal, corner handles to resize, own toolbar (`ToolSelector`, mirrored on the Mission page) with "Clear zones".
-- **Next on this side:** Stage 6 teleop (`FirstPersonTeleopController`, `/cmd_vel_teleop`, camera panel). Next on the WSL side: `twist_mux` (Stage 6).
+- **Stage 6 ROS side done** (WSL repo `5dc5edc`, 2026-11-16, validated live): `twist_mux` routes Nav2 (`cmd_vel_nav_safe`, priority 10) and `/cmd_vel_teleop` (priority 100) into `/cmd_vel`; teleop bypasses `collision_monitor` and the keepout zones; `/hmi/mission_state` gains `teleop`. Details in `IMPLEMENTATION_PLAN.md` (Stage 6 status).
+- **Next on this side:** Stage 6 Unity side (`FirstPersonTeleopController`, `/cmd_vel_teleop`, `/camera/enable`, camera panel). Nothing pending on the WSL side.
 - Prefer Meta Building Blocks and Meta's Interaction SDK patterns over custom code. The Meta Interaction SDK replaces the XR Interaction Toolkit mentioned in `IMPLEMENTATION_PLAN.md`.
 
 ## Unity ↔ ROS 2 interface (Stages 5–6)

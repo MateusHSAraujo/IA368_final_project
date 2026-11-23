@@ -355,3 +355,11 @@ Configure `twist_mux` to prioritize `/cmd_vel_teleop` over `/cmd_vel_nav`, creat
   bash scripts/sync_to_windows.sh
   ```
 * Check that the PowerShell scripts are mirrored in `/mnt/c/Users/mateu/unicamp/IA368/projeto_final/scripts/` (C# and Lua already live on Windows).
+
+#### Stage 6 status — **ROS side done** (2026-11-16, WSL repo; validated live against `scene_house.ttt`). Unity side (`FirstPersonTeleopController`, camera panel) pending (Windows agent).
+* Routing: `controller` -> `cmd_vel_nav` -> `velocity_smoother` -> `cmd_vel_smoothed` -> `collision_monitor` -> `cmd_vel_nav_safe` -> `twist_mux` -> `/cmd_vel`. Nav2 Jazzy already publishes the raw controller output on `cmd_vel_nav`, so the mux takes the safe output `cmd_vel_nav_safe` (priority 10). `/cmd_vel_teleop` has priority 100; both inputs time out after 0.5 s.
+* Teleop bypasses `collision_monitor` and the keepout zones (user decision: full manual authority for rescue).
+* Unity contract: `/cmd_vel_teleop` at >= 10 Hz while the deadman (grip) is held, clamp `|linear.x|` <= 0.5 m/s and `|angular.z|` <= 1.5 rad/s on the Unity side (no ROS-side clamp), one zero Twist on release. Unity never publishes `/cmd_vel`. `/camera/enable` is `true` when the teleop panel opens and `false` when it closes.
+* `/hmi/mission_state` gains `"teleop": true|false` (true while a nonzero teleop command arrived within 0.5 s, and also with no mission). The auto-pause (`paused (teleop)`) is unchanged.
+* ROS-TCP-Endpoint respawns 2 s after an exit (it sometimes exits with `[Errno 9] Bad file descriptor` when Unity leaves Play mode).
+* Tests: 219 offline tests, including `tests/test_twist_mux_offline.py` (config consistency and the real `twist_mux` node on a private `ROS_DOMAIN_ID`). Live: `check_live_stack.py teleop` 8/8 (auto-pause < 0.1 s, odom followed teleop, stop after release, resume to goal with 0.08 m error); `check_tcp_endpoint.py` publishes `/cmd_vel_teleop` through port 10000.
