@@ -29,6 +29,21 @@ namespace VRRobot.Tests
         }
 
         [Test]
+        public void MissionTeleopFlagParsed()
+        {
+            Assert.IsTrue(HmiJson.TryParseMission("{\"state\":\"PAUSED\",\"mode\":\"goal\",\"remaining\":1,\"message\":\"paused (teleop)\",\"teleop\":true}", out var s));
+            Assert.IsTrue(s.teleop);
+            Assert.IsTrue(s.IsPaused);
+        }
+
+        [Test]
+        public void MissionWithoutTeleopFieldIsFalse()
+        {
+            Assert.IsTrue(HmiJson.TryParseMission("{\"state\":\"IDLE\",\"mode\":null,\"remaining\":0,\"message\":\"\"}", out var s));
+            Assert.IsFalse(s.teleop);
+        }
+
+        [Test]
         public void MapStateWithList()
         {
             Assert.IsTrue(HmiJson.TryParseMap("{\"state\":\"READY\",\"map\":\"scene_house\",\"maps\":[\"scene_house\",\"map_1\"],\"ok\":true,\"message\":\"\"}", out var s));

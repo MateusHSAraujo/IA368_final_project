@@ -9,13 +9,15 @@ namespace VRRobot.HMI
 {
     /// <summary>
     /// Mission page of the VR menu (the Spatial Menu of the project plan): opens/closes the operations panel,
-    /// controls the active mission (pause / resume / cancel) and shows the ROS, bridge and mission status. The tool
+    /// controls the active mission (pause / resume / cancel), starts/stops the teleop mode and shows the ROS, bridge and
+    /// mission status. The tool
     /// picker on this page is a <see cref="ToolSelector"/>. Tolerates a missing <see cref="RosHmiClient"/>.
     /// </summary>
     public class VrMissionPage : MonoBehaviour
     {
         [Header("Scene references (fall back to FindFirstObjectByType)")]
         [SerializeField, FormerlySerializedAs("_table")] OperationsPanel _panel;
+        [SerializeField] FirstPersonTeleopController _teleop;
 
         [Header("Operations panel")]
         [SerializeField, FormerlySerializedAs("_tableButton")] Button _panelButton;
@@ -25,6 +27,10 @@ namespace VRRobot.HMI
         [SerializeField] Button _pauseButton;
         [SerializeField] Button _resumeButton;
         [SerializeField] Button _cancelButton;
+
+        [Header("Teleop")]
+        [SerializeField, Tooltip("Starts/stops the teleop mode (same as X on the left controller).")] Button _teleopButton;
+        [SerializeField] TMP_Text _teleopLabel;
 
         [Header("Status")]
         [SerializeField] TMP_Text _rosLabel;
@@ -41,17 +47,20 @@ namespace VRRobot.HMI
         void Awake()
         {
             if (_panel == null) _panel = FindFirstObjectByType<OperationsPanel>(FindObjectsInactive.Include);
+            if (_teleop == null) _teleop = FindFirstObjectByType<FirstPersonTeleopController>(FindObjectsInactive.Include);
 
             if (_panelButton != null) _panelButton.onClick.AddListener(() => { if (_panel != null) _panel.Toggle(); });
             if (_pauseButton != null) _pauseButton.onClick.AddListener(() => Send("PAUSE"));
             if (_resumeButton != null) _resumeButton.onClick.AddListener(() => Send("RESUME"));
             if (_cancelButton != null) _cancelButton.onClick.AddListener(() => Send("CANCEL"));
+            if (_teleopButton != null) _teleopButton.onClick.AddListener(() => { if (_teleop != null) _teleop.Toggle(); });
         }
 
         void OnEnable()
         {
             _ros = RosHmiClient.Instance;
             if (_panel != null) _panel.OpenChanged += OnPanelChanged;
+            if (_teleop != null) _teleop.ActiveChanged += OnTeleopChanged;
             if (_ros != null)
             {
                 _ros.ConnectionChanged += OnConnectionChanged;
@@ -64,6 +73,7 @@ namespace VRRobot.HMI
         void OnDisable()
         {
             if (_panel != null) _panel.OpenChanged -= OnPanelChanged;
+            if (_teleop != null) _teleop.ActiveChanged -= OnTeleopChanged;
             if (_ros != null)
             {
                 _ros.ConnectionChanged -= OnConnectionChanged;
@@ -79,6 +89,7 @@ namespace VRRobot.HMI
         }
 
         void OnPanelChanged(bool open) => RefreshPanel();
+        void OnTeleopChanged(bool active) => RefreshTeleop();
         void OnConnectionChanged(bool connected) => RefreshStatus();
         void OnBridgeChanged(string status) => RefreshStatus();
         void OnMissionChanged(MissionState state) => RefreshStatus();
@@ -86,7 +97,15 @@ namespace VRRobot.HMI
         void RefreshAll()
         {
             RefreshPanel();
+            RefreshTeleop();
             RefreshStatus();
+        }
+
+        void RefreshTeleop()
+        {
+            bool active = _teleop != null && _teleop.IsActive;
+            if (_teleopLabel != null) _teleopLabel.text = active ? "Stop teleop" : "Start teleop";
+            if (_teleopButton != null) _teleopButton.interactable = _teleop != null;
         }
 
         void RefreshPanel()
@@ -96,7 +115,7 @@ namespace VRRobot.HMI
             if (_panelButton != null) _panelButton.interactable = _panel != null;
         }
 
-        static StatusChip.Level MissionLevel(string state)
+        internal static StatusChip.Level MissionLevel(string state)
         {
             switch (state.ToUpperInvariant())
             {
@@ -112,7 +131,7 @@ namespace VRRobot.HMI
             }
         }
 
-        static string TitleCase(string s) => s.Length == 0 ? s : char.ToUpperInvariant(s[0]) + s.Substring(1).ToLowerInvariant();
+        internal static string TitleCase(string s) => s.Length == 0 ? s : char.ToUpperInvariant(s[0]) + s.Substring(1).ToLowerInvariant();
 
         /// <summary>Refreshes the ROS, mission and mission-control state.</summary>
         void RefreshStatus()

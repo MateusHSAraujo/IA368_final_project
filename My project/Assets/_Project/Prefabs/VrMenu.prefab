@@ -5338,11 +5338,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _panel: {fileID: 0}
+  _teleop: {fileID: 0}
   _panelButton: {fileID: 8407289774449723576}
   _panelLabel: {fileID: 2573895783203205682}
   _pauseButton: {fileID: 372359281402743644}
   _resumeButton: {fileID: 2837030187149796430}
   _cancelButton: {fileID: 3852045776779252394}
+  _teleopButton: {fileID: 5891052356744437257}
+  _teleopLabel: {fileID: 5498240076602571874}
   _rosLabel: {fileID: 0}
   _missionLabel: {fileID: 0}
   _messageLabel: {fileID: 2282737589760136576}
@@ -12941,7 +12944,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7088100759736726625, guid: b9b87f4caa5968745bb0a1ee2a51f575, type: 3}
       propertyPath: m_Interactable
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 7582301924461947640, guid: b9b87f4caa5968745bb0a1ee2a51f575, type: 3}
       propertyPath: m_Sprite
@@ -12977,7 +12980,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 9210260128077714954, guid: b9b87f4caa5968745bb0a1ee2a51f575, type: 3}
       propertyPath: m_text
-      value: First-person teleop
+      value: Start teleop
       objectReference: {fileID: 0}
     - target: {fileID: 9210260128077714954, guid: b9b87f4caa5968745bb0a1ee2a51f575, type: 3}
       propertyPath: m_fontSize
@@ -13074,6 +13077,17 @@ MonoBehaviour:
   m_FlexibleWidth: 1
   m_FlexibleHeight: 0
   m_LayoutPriority: 1
+--- !u!114 &5498240076602571874 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 9210260128077714954, guid: b9b87f4caa5968745bb0a1ee2a51f575, type: 3}
+  m_PrefabInstance: {fileID: 3719066187207961192}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1943849408760523458}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &5728646096747002639 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 8943299744121885031, guid: b9b87f4caa5968745bb0a1ee2a51f575, type: 3}
@@ -13099,6 +13113,17 @@ MonoBehaviour:
   m_FlexibleWidth: 0
   m_FlexibleHeight: -1
   m_LayoutPriority: 1
+--- !u!114 &5891052356744437257 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 7088100759736726625, guid: b9b87f4caa5968745bb0a1ee2a51f575, type: 3}
+  m_PrefabInstance: {fileID: 3719066187207961192}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5147583613797364468}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4e29b1a8efbd4b44bb3f3716e73f07ff, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!224 &6943026888373873043 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 6036601228361778171, guid: b9b87f4caa5968745bb0a1ee2a51f575, type: 3}

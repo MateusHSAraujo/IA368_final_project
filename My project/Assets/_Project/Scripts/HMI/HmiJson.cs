@@ -14,6 +14,9 @@ namespace VRRobot.HMI
         public int remaining;
         public string message;
 
+        /// <summary>True while a nonzero /cmd_vel_teleop arrived within 0.5 s (supervisor field; absent in old payloads, so false).</summary>
+        public bool teleop;
+
         public bool IsNavigating => state == "NAVIGATING";
         public bool IsPaused => state == "PAUSED";
         public bool IsActive => IsNavigating || IsPaused;

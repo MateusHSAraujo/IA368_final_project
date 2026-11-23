@@ -118,7 +118,7 @@ Meta XR Operator MCP at `http://127.0.0.1:8720/mcp` while in Play mode: `openxr_
 - Left Menu button: `openxr_set_controller_input` with component "Menu". Trigger: component "Trigger" (no `sub_component`); sticks: "Thumbstick" with `sub_component` "X"/"Y".
 - Simpler ray aiming: read the right `ControllerRayInteractor`'s `_rayOrigin` (position/forward) in Unity, compute the world rotation that turns that forward toward the target, convert it to OpenXR and pre-multiply it into the current grip orientation (`openxr_get_controller_pose`); one refinement step lands within a few pixels.
 
-## HMI (Stage 4 Spatial Menu + Stage 5 operations panel)
+## HMI (Stage 4 Spatial Menu, Stage 5 operations panel, Stage 6 teleop)
 ### Module and ROS link
 - Module `Assets/_Project/Scripts/HMI/`, asmdef `VRRobot.HMI` (refs: VRRobot.Core, VRRobot.SimWorld, VRRobot.XR, Oculus.Interaction, Oculus.VR, UnityEngine.UI, Unity.TextMeshPro, Unity.Robotics.ROSTCPConnector, `.Messages`, `.MessageGeneration`).
 - Pure math in `Scripts/Core/MapGridMath.cs` and `Scripts/Core/PanelMath.cs` (EditMode tests `MapGridMathTests`, `HmiJsonTests`, `PanelMathTests`; suite 51/51).
@@ -126,9 +126,9 @@ Meta XR Operator MCP at `http://127.0.0.1:8720/mcp` while in Play mode: `openxr_
   - `ROS Connection`: `ROSConnection` at 127.0.0.1:10000, protocol ROS2 (`ROS2` define), HUD off, TF listening off.
   - `HMI`: `RosHmiClient`, the only owner of ROS I/O. Raises its events on the main thread.
 - Contract: WSL repo `ros2_ws/src/vr_robot_pkg/README.md`.
-- Subscribes: `/hmi/map`, `/hmi/keepout_mask`, `/hmi/robot_pose`, `/plan`, `/hmi/mission_state`, `/hmi/map_state`, `/myRobot/bridge_status`.
+- Subscribes: `/hmi/map`, `/hmi/keepout_mask`, `/hmi/robot_pose`, `/plan`, `/hmi/mission_state`, `/hmi/map_state`, `/myRobot/bridge_status`, `/camera/image_raw/compressed`.
   - `/hmi/map` and `/hmi/keepout_mask` are volatile copies republished by the mission supervisor. ROS-TCP-Endpoint subscribes volatile and cannot receive the transient_local `/map` or `/keepout_filter_mask`; slam_toolbox publishes `/map` only when the map changes.
-- Publishes: `/hmi/goal` (zero quaternion = face the direction of travel), `/hmi/path`, `/hmi/mission_cmd`, `/hmi/keepout_stroke` (`z` = brush radius, empty = clear), `/hmi/map_cmd`.
+- Publishes: `/hmi/goal` (zero quaternion = face the direction of travel), `/hmi/path`, `/hmi/mission_cmd`, `/hmi/keepout_stroke` (`z` = brush radius, empty = clear), `/hmi/map_cmd`, `/cmd_vel_teleop` and `/camera/enable` (Stage 6). Unity never publishes `/cmd_vel`.
 - Logs use the `[HMI]` prefix.
 
 ### Operations panel
@@ -155,13 +155,29 @@ Formerly the "holographic tactical table" (renamed after the `todos.md` usabilit
 ### World overlay
 - `HMI/World Overlay` (`WorldOverlay`): `/plan`, goal ring, active path and keepout mask drawn on the house floor (y 0.02-0.03).
 
+### Teleop and camera panel (Stage 6)
+- Plan and status: `STAGE6_TELEOP_PLAN.md` (repository root).
+- `HMI` object: `FirstPersonTeleopController`, the owner of the teleop mode. **X** (left controller, `_toggleButton`) or the Mission page button toggles it; it only opens in the `Playing` phase of `AppFlowController`.
+- While the mode is open:
+  - `LocomotionInputGate` is held, so Meta's slide / turn / teleport interactors are off and fly mode ignores the sticks;
+  - the robot camera is on (`/camera/enable` true; false on close);
+  - the **sticks drive the robot**: left stick Y = forward / backward (`linear.x`), right stick X = rotation (left = counter-clockwise, `angular.z > 0`).
+- No grip deadman (user decision, 2026-11-23): the spring-centred sticks are the deadman. Commands go out at 15 Hz (accumulated schedule, so the average holds at low frame rates) only while a stick is deflected, and exactly one zero Twist is sent when both sticks return to the centre, when the mode closes, on pause and on focus loss. Without ROS nothing is sent; twist_mux and the bridge watchdog stop the robot (0.5 s each).
+- Speeds: `Scripts/Core/TeleopMath.cs` (EditMode `TeleopMathTests`). Raw stick axes (`OVRInput.RawAxis2D`), deadzone 0.15 with rescale, response exponent 1.5, clamped to the contract limits 0.5 m/s and 1.5 rad/s whatever the serialized maxima. In the Meta XR Simulator a thumbstick input of 0.6 reads ~0.3 (raw and virtual axes alike; 1 reads 1), so partial speeds look lower there than on the headset.
+- A nonzero teleop command auto-pauses an active mission on the ROS side (`paused (teleop)`); Resume is on the camera panel and the Mission page.
+- `RosHmiClient.SetCameraEnabled` remembers the requested state and publishes it on every (re)connection, false included: the "off" sent when Play mode exits rarely reaches ROS, which used to leave the camera on into the next session.
+- Camera panel: prefab `Prefabs/CameraPanel.prefab`, component `CameraPanel` (same family as the operations panel: same `Pivot` convention, frame bars with trigger ray grab through `PanelGrabTransformer`, pitch 0..60°, all colliders triggers, opens upright in front of the head and stays fixed in the world). It follows `FirstPersonTeleopController.ActiveChanged`; its Close ends the teleop mode.
+  - `Content`: `Screen` (quad, `Materials/HMI/CameraScreen.mat`, 0.64 m × 4:3), `Backdrop`, `Frame/Bottom|Top|Left|Right`, `Status` (ROS / bridge / mission line) and `Placeholder` ("Waiting for the camera image" / "Camera image lost" after 1.5 s without frames / "ROS disconnected").
+  - `Toolbar` (UI Set canvas copied from the operations panel): Teleop chip (Driving / Idle / No camera / Disconnected) and Mission chip with captions, the commanded speeds (or the controls hint while idle), "Resume mission" (UI Set Primary, enabled while the mission is paused) and Close.
+  - Every visual is a prefab object; context menu **Apply Layout** places them around `_screenWidth` (toolbar as wide as the frame). Only the texture and the texts are set at runtime: the newest JPEG is decoded once per frame (`ImageConversion.LoadImage`; the bridge already flips the rows to top-down).
+
 ### VR menu tabs
-- Mission (`VrMissionPage` + `ToolSelector`): open/close panel, tool and brush for the real floor (mirrors the panel toolbar; "Clear no-go zones" in its own row below the brush), Pause / Resume / Cancel enabled by mission state, mission and ROS/bridge status, disabled Stage 6 teleop button.
+- Mission (`VrMissionPage` + `ToolSelector`): open/close panel, tool and brush for the real floor (mirrors the panel toolbar; "Clear no-go zones" in its own row below the brush), Pause / Resume / Cancel enabled by mission state, mission and ROS/bridge status, "Start teleop / Stop teleop" (Stage 6).
 - Map (`VrMapPage`): saved maps list with Load; Save as new `map_YYYYMMDD_HHMM`; Overwrite current; Reset map and Clear no-go zones, each with a two-step confirm. Buttons are disabled while BUSY or disconnected.
 - Settings: as described in the VR menu section above.
 
 ### UI theme (Meta UI Set)
-- Both menus (`StartMenu.prefab`, `VrMenu.prefab`) follow Meta's Interaction SDK **UI Set** (`Packages/com.meta.xr.sdk.interaction/Runtime/Sample/Objects/UISet`), the reference for every new panel.
+- Both menus (`StartMenu.prefab`, `VrMenu.prefab`) and the toolbars of `OperationsPanel.prefab` and `CameraPanel.prefab` follow Meta's Interaction SDK **UI Set** (`Packages/com.meta.xr.sdk.interaction/Runtime/Sample/Objects/UISet`), the reference for every new panel.
 - Each menu root has Meta's `UIThemeManager` with `UIThemeQuest_Dark`. In `Start` it applies the theme to all children, driven by `QDSUI*` tags:
   - backplate (`QDSUIBackplateGradient`, material `RoundedBoxGradientUIDark`), section plates (`QDSUISection`), accent (`QDSUIAccentColor`);
   - button state colors through Animator controllers chosen by tag (Primary / Secondary / Destructive / ToggleButton / ToggleSwitch);

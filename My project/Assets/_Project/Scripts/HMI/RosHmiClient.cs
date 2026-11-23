@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using RosMessageTypes.Geometry;
 using RosMessageTypes.Nav;
+using RosMessageTypes.Sensor;
 using RosMessageTypes.Std;
 using Unity.Robotics.ROSTCPConnector;
 using UnityEngine;
@@ -26,6 +27,10 @@ namespace VRRobot.HMI
         [SerializeField] string _missionCmdTopic = "/hmi/mission_cmd";
         [SerializeField] string _keepoutStrokeTopic = "/hmi/keepout_stroke";
         [SerializeField] string _mapCmdTopic = "/hmi/map_cmd";
+        [SerializeField, Tooltip("Manual driving (twist_mux priority 100). Unity clamps the speeds; see TeleopMath.")]
+        string _teleopTopic = "/cmd_vel_teleop";
+        [SerializeField, Tooltip("Turns the robot camera on/off (off by default on the ROS side).")]
+        string _cameraEnableTopic = "/camera/enable";
 
         [Header("Subscribed topics")]
         [SerializeField, Tooltip("Volatile copy of /map republished by the supervisor (the endpoint cannot receive the " +
@@ -37,6 +42,8 @@ namespace VRRobot.HMI
         [SerializeField] string _missionStateTopic = "/hmi/mission_state";
         [SerializeField] string _mapStateTopic = "/hmi/map_state";
         [SerializeField] string _bridgeStatusTopic = "/myRobot/bridge_status";
+        [SerializeField, Tooltip("JPEG frames, published by the bridge only while the camera is enabled.")]
+        string _cameraImageTopic = "/camera/image_raw/compressed";
 
         const string MapFrame = "map";
         const string LogPrefix = "[HMI] ";
@@ -73,9 +80,18 @@ namespace VRRobot.HMI
         public string BridgeStatus { get; private set; }
         public event Action<string> BridgeStatusChanged;
 
+        /// <summary>Latest compressed camera frame (JPEG bytes), or null before the first one.</summary>
+        public byte[] LastCameraFrame { get; private set; }
+        public float LastCameraFrameTime { get; private set; } = float.NegativeInfinity;
+        public event Action<byte[]> CameraFrameReceived;
+
+        /// <summary>Last state requested through <see cref="SetCameraEnabled"/>; re-sent on every reconnection.</summary>
+        public bool CameraRequested { get; private set; }
+
         ROSConnection _conn;
         bool _started;
         bool _warnedYaw;
+        bool _loggedCameraFrame;
 
         void Awake() => Instance = this;
 
@@ -83,7 +99,10 @@ namespace VRRobot.HMI
         {
             if (Instance == this) Instance = null;
             if (_conn == null) return;
-            foreach (var t in new[] { _mapTopic, _keepoutMaskTopic, _robotPoseTopic, _planTopic, _missionStateTopic, _mapStateTopic, _bridgeStatusTopic })
+            // Best effort: the camera costs bridge bandwidth and CoppeliaSim rendering, so switch it off on exit.
+            if (_started && CameraRequested) _conn.Publish(_cameraEnableTopic, new BoolMsg(false));
+            foreach (var t in new[] { _mapTopic, _keepoutMaskTopic, _robotPoseTopic, _planTopic, _missionStateTopic, _mapStateTopic,
+                                      _bridgeStatusTopic, _cameraImageTopic })
                 _conn.Unsubscribe(t);
         }
 
@@ -97,6 +116,8 @@ namespace VRRobot.HMI
             _conn.RegisterPublisher<StringMsg>(_missionCmdTopic);
             _conn.RegisterPublisher<PolygonStampedMsg>(_keepoutStrokeTopic);
             _conn.RegisterPublisher<StringMsg>(_mapCmdTopic);
+            _conn.RegisterPublisher<TwistMsg>(_teleopTopic);
+            _conn.RegisterPublisher<BoolMsg>(_cameraEnableTopic);
 
             _conn.Subscribe<OccupancyGridMsg>(_mapTopic, OnMap);
             _conn.Subscribe<OccupancyGridMsg>(_keepoutMaskTopic, OnKeepoutMask);
@@ -105,6 +126,7 @@ namespace VRRobot.HMI
             _conn.Subscribe<StringMsg>(_missionStateTopic, OnMissionState);
             _conn.Subscribe<StringMsg>(_mapStateTopic, OnMapState);
             _conn.Subscribe<StringMsg>(_bridgeStatusTopic, OnBridgeStatus);
+            _conn.Subscribe<CompressedImageMsg>(_cameraImageTopic, OnCameraImage);
             _started = true;
         }
 
@@ -115,6 +137,10 @@ namespace VRRobot.HMI
             if (connected == IsConnected) return;
             IsConnected = connected;
             Debug.Log(LogPrefix + (connected ? "connected to ROS" : "disconnected from ROS"));
+            // Sync the camera with the requested state on every connection, false included: the "off" sent when Play
+            // mode / the app exits rarely reaches ROS (the connection closes first), which left the camera running into
+            // the next session; the endpoint also respawns after an exit.
+            if (connected) _conn.Publish(_cameraEnableTopic, new BoolMsg(CameraRequested));
             ConnectionChanged?.Invoke(connected);
         }
 
@@ -209,6 +235,19 @@ namespace VRRobot.HMI
             BridgeStatusChanged?.Invoke(BridgeStatus);
         }
 
+        void OnCameraImage(CompressedImageMsg msg)
+        {
+            if (msg.data == null || msg.data.Length == 0) return;
+            LastCameraFrame = msg.data;
+            LastCameraFrameTime = Time.time;
+            if (!_loggedCameraFrame)
+            {
+                _loggedCameraFrame = true;
+                Debug.Log(LogPrefix + $"first camera frame: {msg.format}, {msg.data.Length} bytes");
+            }
+            CameraFrameReceived?.Invoke(msg.data);
+        }
+
         /// <summary>Converts the grid metadata; warns once when the origin yaw is not ~0 (it is ignored).</summary>
         public static GridInfo ToGridInfo(MapMetaDataMsg info)
         {
@@ -277,6 +316,26 @@ namespace VRRobot.HMI
             if (!CanSend("map_cmd")) return;
             _conn.Publish(_mapCmdTopic, new StringMsg(cmd));
             Debug.Log(LogPrefix + "map_cmd " + cmd);
+        }
+
+        /// <summary>
+        /// Publishes one teleop command (ROS convention: <paramref name="linear"/> = linear.x in m/s, forward positive;
+        /// <paramref name="angular"/> = angular.z in rad/s, counter-clockwise positive). The caller clamps the speeds
+        /// (<see cref="TeleopMath"/>) and keeps the rate at or above 10 Hz while driving. Not logged (high rate).
+        /// </summary>
+        public void SendTeleop(float linear, float angular)
+        {
+            if (!CanSend("teleop")) return;
+            _conn.Publish(_teleopTopic, new TwistMsg(new Vector3Msg(linear, 0.0, 0.0), new Vector3Msg(0.0, 0.0, angular)));
+        }
+
+        /// <summary>Turns the robot camera on or off; the state is remembered and re-sent after a reconnection.</summary>
+        public void SetCameraEnabled(bool on)
+        {
+            CameraRequested = on;
+            if (!CanSend("camera enable")) return;
+            _conn.Publish(_cameraEnableTopic, new BoolMsg(on));
+            Debug.Log(LogPrefix + "camera " + (on ? "enabled" : "disabled"));
         }
 
         // ---- Helpers -------------------------------------------------------------------------------------------

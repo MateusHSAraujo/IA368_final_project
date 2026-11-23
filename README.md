@@ -15,6 +15,7 @@ This repository holds the **Windows side**: the Unity project, the CoppeliaSim s
 ├── STAGE1_UNITY_PLAN.md      # Stage 1 plan and execution status (CoppeliaSim → Unity converter)
 ├── STAGE4_VR_LOCOMOTION_PLAN.md # Stage 4 (part 1) plan and status: VR scene + locomotion (Meta XR SDK)
 ├── STAGE5_TACTICAL_TABLE_PLAN.md # Stage 4 Spatial Menu + Stage 5 Unity side plan and status: operations panel and HMI tools
+├── STAGE6_TELEOP_PLAN.md     # Stage 6 Unity side plan and status: teleop mode and camera panel
 ├── CLAUDE.md                 # Instructions for the Windows-side agent
 ├── coppelia_scripts/         # ZMQ scene streamer (Lua) + installer, protocol test, reference capture
 ├── scene_house/              # CoppeliaSim scenes (Git LFS)
@@ -37,7 +38,7 @@ This repository holds the **Windows side**: the Unity project, the CoppeliaSim s
 | 3. P3-DX ROS 2 stack: bridge, slam_toolbox, Nav2 + Keepout Filter, ROS-TCP-Endpoint | Done (ROS repo) |
 | 4. VR scene: locomotion, VR menu, start flow (`VrScene.unity`, Meta XR Simulator) | Done (locomotion, Spatial Menu with Mission / Map / Settings pages) |
 | 5. Holographic Tactical Table (operations panel) + mission supervisor | Done (ROS side: supervisor and saved maps; Unity side: operations panel, goal / path / no-go tools) |
-| 6. First-person teleoperation + `twist_mux` | ROS side done (`twist_mux`, teleop priority); Unity side pending |
+| 6. First-person teleoperation + `twist_mux` | Done (ROS side: `twist_mux`, teleop priority; Unity side: teleop mode, stick driving, camera panel) |
 
 ## VR scene
 
