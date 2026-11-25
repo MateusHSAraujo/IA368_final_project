@@ -3,19 +3,13 @@
 **Course:** Design and Development of Intelligent Autonomous Robots (IA368) — FEEC / Unicamp
 **Author:** Mateus Henrique Silva Araújo
 
-Immersive VR/MR human-machine interface (Meta Quest 3, Unity) for tactical planning, monitoring and first-person teleoperation of a Pioneer P3-DX simulated in CoppeliaSim, integrated with ROS 2 Jazzy and Nav2. See [`PROJECT_PROPOSAL.md`](PROJECT_PROPOSAL.md).
+Immersive VR/MR human-machine interface (Meta Quest 3, Unity) for tactical planning, monitoring and first-person teleoperation of a Pioneer P3-DX simulated in CoppeliaSim, integrated with ROS 2 Jazzy and Nav2.
 
-This repository holds the **Windows side**: the Unity project, the CoppeliaSim scripts and scenes, and the planning documents. The ROS 2 side lives in [`IA368_final_project_ros2`](https://github.com/MateusHSAraujo/IA368_final_project_ros2) (WSL2).
+This repository holds the **Windows side**: the Unity project and the CoppeliaSim scripts and scenes. The ROS 2 side lives in [`IA368_final_project_ros2`](https://github.com/MateusHSAraujo/IA368_final_project_ros2) (WSL2).
 
 ## Structure
 
 ```text
-├── PROJECT_PROPOSAL.md       # Project proposal
-├── IMPLEMENTATION_PLAN.md    # Stage-by-stage implementation plan
-├── STAGE1_UNITY_PLAN.md      # Stage 1 plan and execution status (CoppeliaSim → Unity converter)
-├── STAGE4_VR_LOCOMOTION_PLAN.md # Stage 4 (part 1) plan and status: VR scene + locomotion (Meta XR SDK)
-├── STAGE5_TACTICAL_TABLE_PLAN.md # Stage 4 Spatial Menu + Stage 5 Unity side plan and status: operations panel and HMI tools
-├── STAGE6_TELEOP_PLAN.md     # Stage 6 Unity side plan and status: teleop mode and camera panel
 ├── CLAUDE.md                 # Instructions for the Windows-side agent
 ├── coppelia_scripts/         # ZMQ scene streamer (Lua) + installer, protocol test, reference capture
 ├── scene_house/              # CoppeliaSim scenes (Git LFS)

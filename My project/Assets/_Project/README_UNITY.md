@@ -156,7 +156,6 @@ Formerly the "holographic tactical table" (renamed after the `todos.md` usabilit
 - `HMI/World Overlay` (`WorldOverlay`): `/plan`, goal ring, active path and keepout mask drawn on the house floor (y 0.02-0.03).
 
 ### Teleop and camera panel (Stage 6)
-- Plan and status: `STAGE6_TELEOP_PLAN.md` (repository root).
 - `HMI` object: `FirstPersonTeleopController`, the owner of the teleop mode. **X** (left controller, `_toggleButton`) or the Mission page button toggles it; it only opens in the `Playing` phase of `AppFlowController`.
 - While the mode is open:
   - `LocomotionInputGate` is held, so Meta's slide / turn / teleport interactors are off and fly mode ignores the sticks;
